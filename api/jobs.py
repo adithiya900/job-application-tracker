@@ -1,152 +1,124 @@
 from flask import Blueprint, request, jsonify
-from extensions import db
-from models.job import Job
+
+from services.application_service import ApplicationService
+from exceptions.application_exceptions import (
+    ApplicationNotFound,
+    DuplicateApplication
+)
+from models.job import ApplicationStatus
+
 
 jobs_bp = Blueprint("jobs", __name__)
 
 
-# Add a new job
-@jobs_bp.route("/jobs", methods=["POST"])
-def add_job():
-    data = request.get_json()
-
-    # Check if request contains JSON data
-    if not data:
-        return jsonify({
-            "error": "No data provided"
-        }), 400
-
-    # Validate required fields
-    if not data.get("company"):
-        return jsonify({
-            "error": "Company is required"
-        }), 400
-
-    if not data.get("position"):
-        return jsonify({
-            "error": "Position is required"
-        }), 400
-
+# Create application
+@jobs_bp.route("/applications", methods=["POST"])
+def create_application():
     try:
-        new_job = Job(
-            company=data["company"],
-            position=data["position"],
-            status=data.get("status", "Applied"),
-            location=data.get("location")
-        )
+        data = request.get_json()
 
-        db.session.add(new_job)
-        db.session.commit()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        if "status" in data:
+            data["status"] = ApplicationStatus[data["status"]]
+
+        application = ApplicationService.create_application(data)
 
         return jsonify({
-            "message": "Job added successfully!",
-            "id": new_job.id
+            "message": "Application created successfully!",
+            "id": application.id
         }), 201
 
-    except Exception as e:
-        db.session.rollback()
+    except DuplicateApplication as e:
+        return jsonify({"error": str(e)}), 409
 
+    except KeyError as e:
         return jsonify({
-            "error": "Failed to add job",
-            "details": str(e)
-        }), 500
+            "error": f"Missing required field: {str(e)}"
+        }), 400
 
 
-# Get all jobs with status filter and company search
-@jobs_bp.route("/jobs", methods=["GET"])
-def get_jobs():
-    status = request.args.get("status")
-    search = request.args.get("search")
+# Get all applications
+@jobs_bp.route("/applications", methods=["GET"])
+def get_all_applications():
 
-    query = Job.query
-
-    if status:
-        query = query.filter_by(status=status)
-
-    if search:
-        query = query.filter(Job.company.ilike(f"%{search}%"))
-
-    jobs = query.all()
+    applications = ApplicationService.get_all_applications()
 
     result = []
 
-    for job in jobs:
+    for application in applications:
         result.append({
-            "id": job.id,
-            "company": job.company,
-            "position": job.position,
-            "status": job.status,
-            "location": job.location
+            "id": application.id,
+            "company": application.company,
+            "role": application.role,
+            "status": application.status.value,
+            "notes": application.notes,
+            "user_id": application.user_id
         })
 
-    return jsonify(result)
+    return jsonify(result), 200
 
 
-# Get a specific job by ID
-@jobs_bp.route("/jobs/<int:id>", methods=["GET"])
-def get_job(id):
-    job = Job.query.get_or_404(id)
-
-    return jsonify({
-        "id": job.id,
-        "company": job.company,
-        "position": job.position,
-        "status": job.status,
-        "location": job.location
-    })
-
-
-# Update a job by ID
-@jobs_bp.route("/jobs/<int:id>", methods=["PUT"])
-def update_job(id):
-    job = Job.query.get_or_404(id)
-
-    data = request.get_json()
-
-    if not data:
-        return jsonify({
-            "error": "No data provided"
-        }), 400
+# Get application by ID
+@jobs_bp.route("/applications/<int:application_id>", methods=["GET"])
+def get_application(application_id):
 
     try:
-        job.company = data.get("company", job.company)
-        job.position = data.get("position", job.position)
-        job.status = data.get("status", job.status)
-        job.location = data.get("location", job.location)
-
-        db.session.commit()
+        application = ApplicationService.get_application_by_id(
+            application_id
+        )
 
         return jsonify({
-            "message": "Job updated successfully!",
-            "id": job.id
-        })
+            "id": application.id,
+            "company": application.company,
+            "role": application.role,
+            "status": application.status.value,
+            "notes": application.notes,
+            "user_id": application.user_id
+        }), 200
 
-    except Exception as e:
-        db.session.rollback()
-
-        return jsonify({
-            "error": "Failed to update job",
-            "details": str(e)
-        }), 500
+    except ApplicationNotFound as e:
+        return jsonify({"error": str(e)}), 404
 
 
-# Delete a job by ID
-@jobs_bp.route("/jobs/<int:id>", methods=["DELETE"])
-def delete_job(id):
-    job = Job.query.get_or_404(id)
+# Update application
+@jobs_bp.route("/applications/<int:application_id>", methods=["PUT"])
+def update_application(application_id):
 
     try:
-        db.session.delete(job)
-        db.session.commit()
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        if "status" in data:
+            data["status"] = ApplicationStatus[data["status"]]
+
+        application = ApplicationService.update_application(
+            application_id,
+            data
+        )
 
         return jsonify({
-            "message": "Job deleted successfully!"
-        })
+            "message": "Application updated successfully!",
+            "id": application.id
+        }), 200
 
-    except Exception as e:
-        db.session.rollback()
+    except ApplicationNotFound as e:
+        return jsonify({"error": str(e)}), 404
+
+
+# Delete application
+@jobs_bp.route("/applications/<int:application_id>", methods=["DELETE"])
+def delete_application(application_id):
+
+    try:
+        ApplicationService.delete_application(application_id)
 
         return jsonify({
-            "error": "Failed to delete job",
-            "details": str(e)
-        }), 500
+            "message": "Application deleted successfully!"
+        }), 200
+
+    except ApplicationNotFound as e:
+        return jsonify({"error": str(e)}), 404

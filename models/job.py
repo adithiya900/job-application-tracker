@@ -1,9 +1,8 @@
-from extensions import db
 from datetime import date
+from extensions import db
 import enum
 
 
-# Status Enum
 class ApplicationStatus(enum.Enum):
     APPLIED = "APPLIED"
     PHONE_SCREEN = "PHONE_SCREEN"
@@ -15,11 +14,20 @@ class ApplicationStatus(enum.Enum):
 class JobApplication(db.Model):
     __tablename__ = "job_applications"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
-    company = db.Column(db.String(100), nullable=False)
+    company = db.Column(
+        db.String(100),
+        nullable=False
+    )
 
-    role = db.Column(db.String(100), nullable=False)
+    role = db.Column(
+        db.String(100),
+        nullable=False
+    )
 
     status = db.Column(
         db.Enum(ApplicationStatus),
@@ -27,15 +35,18 @@ class JobApplication(db.Model):
         default=ApplicationStatus.APPLIED
     )
 
+    # Automatically stores today's date
     applied_date = db.Column(
         db.Date,
         nullable=False,
         default=date.today
     )
 
-    notes = db.Column(db.Text, nullable=True)
+    notes = db.Column(
+        db.Text,
+        nullable=True
+    )
 
-    # Foreign key - belongs to a User
     user_id = db.Column(
         db.Integer,
         db.ForeignKey("users.id"),
@@ -43,4 +54,7 @@ class JobApplication(db.Model):
     )
 
     def __repr__(self):
-        return f"<JobApplication {self.company} - {self.role}>"
+        return (
+            f"<JobApplication "
+            f"{self.company} - {self.role}>"
+        )

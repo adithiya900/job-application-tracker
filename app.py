@@ -5,9 +5,13 @@ import os
 from extensions import db
 from flask_migrate import Migrate
 
-# Import models so Flask-Migrate can detect them
+# Import models
 from models.job import JobApplication
 from models.user import User
+
+# Import Blueprint
+from api.jobs import jobs_bp
+
 
 load_dotenv()
 
@@ -16,11 +20,15 @@ app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+
 # Initialize database
 db.init_app(app)
 
 # Initialize migrations
 migrate = Migrate(app, db)
+
+# Register Blueprint
+app.register_blueprint(jobs_bp)
 
 
 @app.route("/")
