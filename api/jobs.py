@@ -1,6 +1,9 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from werkzeug.utils import secure_filename
+import os
 
+from extensions import db
 from services.application_service import ApplicationService
 from exceptions.application_exceptions import (
     ApplicationNotFound,
@@ -33,7 +36,8 @@ def serialize_application(application):
             else None
         ),
         "notes": application.notes,
-        "user_id": application.user_id
+        "user_id": application.user_id,
+        "resume_path": application.resume_path
     }
 
 
@@ -51,30 +55,31 @@ def create_application():
         data = request.get_json()
 
         if not data:
+
             return jsonify({
                 "error": "No data provided"
             }), 400
 
 
-        # Validate company
         if not data.get("company"):
+
             return jsonify({
                 "error": "Company is required"
             }), 400
 
 
-        # Validate role
         if not data.get("role"):
+
             return jsonify({
                 "error": "Role is required"
             }), 400
 
 
-        # Get logged-in user ID
-        user_id = int(get_jwt_identity())
+        user_id = int(
+            get_jwt_identity()
+        )
 
 
-        # Convert status string to Enum
         if data.get("status"):
 
             try:
@@ -90,20 +95,21 @@ def create_application():
                 }), 400
 
 
-        # Create application
-        application = ApplicationService.create_application(
-            data,
-            user_id
+        application = (
+            ApplicationService.create_application(
+                data,
+                user_id
+            )
         )
 
 
         return jsonify({
 
-            "message": "Application created successfully!",
+            "message":
+                "Application created successfully!",
 
-            "application": serialize_application(
-                application
-            )
+            "application":
+                serialize_application(application)
 
         }), 201
 
@@ -125,7 +131,6 @@ def create_application():
 # ==========================================
 # Get All Applications
 # GET /applications
-# Search + Filter + Sorting + Pagination
 # ==========================================
 
 @jobs_bp.route("/applications", methods=["GET"])
@@ -134,13 +139,10 @@ def get_all_applications():
 
     try:
 
-        # Logged-in user
-        user_id = int(get_jwt_identity())
+        user_id = int(
+            get_jwt_identity()
+        )
 
-
-        # ==========================================
-        # Query Parameters
-        # ==========================================
 
         search = request.args.get("search")
 
@@ -151,10 +153,6 @@ def get_all_applications():
             "newest"
         ).lower()
 
-
-        # ==========================================
-        # Pagination
-        # ==========================================
 
         page = request.args.get(
             "page",
@@ -168,10 +166,6 @@ def get_all_applications():
             type=int
         )
 
-
-        # ==========================================
-        # Validate Sorting
-        # ==========================================
 
         allowed_sorts = [
             "newest",
@@ -192,10 +186,6 @@ def get_all_applications():
             }), 400
 
 
-        # ==========================================
-        # Validate Pagination
-        # ==========================================
-
         if page < 1:
             page = 1
 
@@ -207,10 +197,6 @@ def get_all_applications():
         if per_page > 100:
             per_page = 100
 
-
-        # ==========================================
-        # Convert Status to Enum
-        # ==========================================
 
         if status:
 
@@ -227,29 +213,24 @@ def get_all_applications():
                 }), 400
 
 
-        # ==========================================
-        # Get Applications
-        # ==========================================
+        pagination = (
+            ApplicationService.get_all_applications(
 
-        pagination = ApplicationService.get_all_applications(
+                user_id=user_id,
 
-            user_id=user_id,
+                search=search,
 
-            search=search,
+                status=status,
 
-            status=status,
+                sort=sort,
 
-            sort=sort,
+                page=page,
 
-            page=page,
+                per_page=per_page
 
-            per_page=per_page
+            )
         )
 
-
-        # ==========================================
-        # Serialize Applications
-        # ==========================================
 
         applications = [
 
@@ -259,10 +240,6 @@ def get_all_applications():
 
         ]
 
-
-        # ==========================================
-        # Response
-        # ==========================================
 
         return jsonify({
 
@@ -308,7 +285,9 @@ def get_dashboard_statistics():
 
     try:
 
-        user_id = int(get_jwt_identity())
+        user_id = int(
+            get_jwt_identity()
+        )
 
 
         statistics = (
@@ -344,7 +323,9 @@ def get_application(application_id):
 
     try:
 
-        user_id = int(get_jwt_identity())
+        user_id = int(
+            get_jwt_identity()
+        )
 
 
         application = (
@@ -396,7 +377,6 @@ def update_application(application_id):
         data = request.get_json()
 
 
-        # Validate data
         if not data:
 
             return jsonify({
@@ -404,15 +384,10 @@ def update_application(application_id):
             }), 400
 
 
-        # Logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
-
-        # ==========================================
-        # Convert Status String to Enum
-        # ==========================================
 
         if data.get("status"):
 
@@ -431,10 +406,6 @@ def update_application(application_id):
                 }), 400
 
 
-        # ==========================================
-        # Update Application
-        # ==========================================
-
         application = (
             ApplicationService.update_application(
 
@@ -450,13 +421,11 @@ def update_application(application_id):
 
         return jsonify({
 
-            "message": (
-                "Application updated successfully!"
-            ),
+            "message":
+                "Application updated successfully!",
 
-            "application": serialize_application(
-                application
-            )
+            "application":
+                serialize_application(application)
 
         }), 200
 
@@ -505,11 +474,189 @@ def delete_application(application_id):
 
         return jsonify({
 
-            "message": (
+            "message":
                 "Application deleted successfully!"
-            )
 
         }), 200
+
+
+    except ApplicationNotFound as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 404
+
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
+# Upload Resume
+# POST /applications/<id>/resume
+# ==========================================
+
+@jobs_bp.route(
+    "/applications/<int:application_id>/resume",
+    methods=["POST"]
+)
+@jwt_required()
+def upload_resume(application_id):
+
+    try:
+
+        user_id = int(
+            get_jwt_identity()
+        )
+
+
+        if "resume" not in request.files:
+
+            return jsonify({
+                "error": "Resume file is required"
+            }), 400
+
+
+        file = request.files["resume"]
+
+
+        if file.filename == "":
+
+            return jsonify({
+                "error": "No file selected"
+            }), 400
+
+
+        if not file.filename.lower().endswith(".pdf"):
+
+            return jsonify({
+                "error": "Only PDF files are allowed"
+            }), 400
+
+
+        application = (
+            ApplicationService.get_application_by_id(
+                application_id,
+                user_id
+            )
+        )
+
+
+        upload_folder = "uploads"
+
+
+        os.makedirs(
+            upload_folder,
+            exist_ok=True
+        )
+
+
+        original_filename = secure_filename(
+            file.filename
+        )
+
+
+        filename = (
+            f"{application_id}_{original_filename}"
+        )
+
+
+        file_path = os.path.join(
+            upload_folder,
+            filename
+        )
+
+
+        file.save(
+            file_path
+        )
+
+
+        application.resume_path = file_path
+
+        db.session.commit()
+
+
+        return jsonify({
+
+            "message":
+                "Resume uploaded successfully!",
+
+            "resume_path":
+                file_path
+
+        }), 200
+
+
+    except ApplicationNotFound as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 404
+
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
+# Download Resume
+# GET /applications/<id>/resume
+# ==========================================
+
+@jobs_bp.route(
+    "/applications/<int:application_id>/resume",
+    methods=["GET"]
+)
+@jwt_required()
+def download_resume(application_id):
+
+    try:
+
+        user_id = int(
+            get_jwt_identity()
+        )
+
+
+        application = (
+            ApplicationService.get_application_by_id(
+                application_id,
+                user_id
+            )
+        )
+
+
+        if not application.resume_path:
+
+            return jsonify({
+                "error":
+                    "No resume uploaded for this application"
+            }), 404
+
+
+        if not os.path.exists(
+            application.resume_path
+        ):
+
+            return jsonify({
+                "error":
+                    "Resume file not found"
+            }), 404
+
+
+        return send_file(
+
+            application.resume_path,
+
+            as_attachment=True
+
+        )
 
 
     except ApplicationNotFound as e:

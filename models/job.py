@@ -47,6 +47,14 @@ class JobApplication(db.Model):
         nullable=True
     )
 
+    # =========================
+    # Resume File Path
+    # =========================
+    resume_path = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
     user_id = db.Column(
         db.Integer,
         db.ForeignKey("users.id"),

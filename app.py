@@ -119,10 +119,8 @@ register_error_handlers(app)
 # Register API Blueprints
 # =========================
 
-# Job Application APIs
 app.register_blueprint(jobs_bp)
 
-# Authentication APIs
 app.register_blueprint(auth_bp)
 
 
@@ -696,6 +694,152 @@ def swagger_json():
                         "401": {
                             "description":
                                 "Unauthorized"
+                        }
+
+                    }
+
+                }
+
+            },
+
+
+            # =========================
+            # Resume Upload & Download
+            # =========================
+
+            "/applications/{application_id}/resume": {
+
+                # Upload Resume
+                "post": {
+
+                    "tags": [
+                        "Resume"
+                    ],
+
+                    "summary":
+                        "Upload resume for an application",
+
+                    "consumes": [
+                        "multipart/form-data"
+                    ],
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer",
+
+                            "description":
+                                "Application ID"
+                        },
+
+                        {
+                            "name": "resume",
+
+                            "in": "formData",
+
+                            "required": True,
+
+                            "type": "file",
+
+                            "description":
+                                "Upload PDF resume"
+                        }
+
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Resume uploaded successfully"
+                        },
+
+                        "400": {
+                            "description":
+                                "Invalid or missing resume file"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        },
+
+                        "404": {
+                            "description":
+                                "Application not found"
+                        }
+
+                    }
+
+                },
+
+
+                # Download Resume
+                "get": {
+
+                    "tags": [
+                        "Resume"
+                    ],
+
+                    "summary":
+                        "Download application resume",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer",
+
+                            "description":
+                                "Application ID"
+                        }
+
+                    ],
+
+                    "produces": [
+                        "application/pdf"
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Resume downloaded successfully"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        },
+
+                        "404": {
+                            "description":
+                                "Resume or application not found"
                         }
 
                     }
