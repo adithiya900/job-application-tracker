@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
+from PyPDF2 import PdfReader
 import os
 
 from extensions import db
@@ -61,6 +62,7 @@ def create_application():
             }), 400
 
 
+        # Validate company
         if not data.get("company"):
 
             return jsonify({
@@ -68,6 +70,7 @@ def create_application():
             }), 400
 
 
+        # Validate role
         if not data.get("role"):
 
             return jsonify({
@@ -75,11 +78,13 @@ def create_application():
             }), 400
 
 
+        # Get logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
 
+        # Convert status string to Enum
         if data.get("status"):
 
             try:
@@ -95,6 +100,7 @@ def create_application():
                 }), 400
 
 
+        # Create application
         application = (
             ApplicationService.create_application(
                 data,
@@ -131,6 +137,7 @@ def create_application():
 # ==========================================
 # Get All Applications
 # GET /applications
+# Search + Filter + Sorting + Pagination
 # ==========================================
 
 @jobs_bp.route("/applications", methods=["GET"])
@@ -139,11 +146,13 @@ def get_all_applications():
 
     try:
 
+        # Logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
 
+        # Query parameters
         search = request.args.get("search")
 
         status = request.args.get("status")
@@ -154,6 +163,7 @@ def get_all_applications():
         ).lower()
 
 
+        # Pagination
         page = request.args.get(
             "page",
             1,
@@ -167,6 +177,7 @@ def get_all_applications():
         )
 
 
+        # Validate sorting
         allowed_sorts = [
             "newest",
             "oldest",
@@ -186,18 +197,23 @@ def get_all_applications():
             }), 400
 
 
+        # Validate pagination
         if page < 1:
+
             page = 1
 
 
         if per_page < 1:
+
             per_page = 5
 
 
         if per_page > 100:
+
             per_page = 100
 
 
+        # Convert status to Enum
         if status:
 
             try:
@@ -213,6 +229,7 @@ def get_all_applications():
                 }), 400
 
 
+        # Get applications
         pagination = (
             ApplicationService.get_all_applications(
 
@@ -232,6 +249,7 @@ def get_all_applications():
         )
 
 
+        # Serialize applications
         applications = [
 
             serialize_application(application)
@@ -340,9 +358,7 @@ def get_application(application_id):
 
 
         return jsonify(
-
             serialize_application(application)
-
         ), 200
 
 
@@ -384,20 +400,20 @@ def update_application(application_id):
             }), 400
 
 
+        # Logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
 
+        # Convert status string to Enum
         if data.get("status"):
 
             try:
 
-                data["status"] = (
-                    ApplicationStatus[
-                        data["status"].upper()
-                    ]
-                )
+                data["status"] = ApplicationStatus[
+                    data["status"].upper()
+                ]
 
             except KeyError:
 
@@ -406,6 +422,7 @@ def update_application(application_id):
                 }), 400
 
 
+        # Update application
         application = (
             ApplicationService.update_application(
 
@@ -463,6 +480,9 @@ def delete_application(application_id):
         )
 
 
+        # ApplicationService handles:
+        # 1. Application deletion
+        # 2. Resume file deletion
         ApplicationService.delete_application(
 
             application_id,
@@ -475,7 +495,7 @@ def delete_application(application_id):
         return jsonify({
 
             "message":
-                "Application deleted successfully!"
+                "Application and resume deleted successfully!"
 
         }), 200
 
@@ -508,11 +528,13 @@ def upload_resume(application_id):
 
     try:
 
+        # Get logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
 
+        # Check resume file
         if "resume" not in request.files:
 
             return jsonify({
@@ -523,6 +545,7 @@ def upload_resume(application_id):
         file = request.files["resume"]
 
 
+        # Check filename
         if file.filename == "":
 
             return jsonify({
@@ -530,6 +553,7 @@ def upload_resume(application_id):
             }), 400
 
 
+        # Allow only PDF
         if not file.filename.lower().endswith(".pdf"):
 
             return jsonify({
@@ -537,6 +561,7 @@ def upload_resume(application_id):
             }), 400
 
 
+        # Get application and verify ownership
         application = (
             ApplicationService.get_application_by_id(
                 application_id,
@@ -545,8 +570,8 @@ def upload_resume(application_id):
         )
 
 
+        # Upload folder
         upload_folder = "uploads"
-
 
         os.makedirs(
             upload_folder,
@@ -554,27 +579,32 @@ def upload_resume(application_id):
         )
 
 
+        # Secure filename
         original_filename = secure_filename(
             file.filename
         )
 
 
+        # Unique filename
         filename = (
             f"{application_id}_{original_filename}"
         )
 
 
+        # Complete path
         file_path = os.path.join(
             upload_folder,
             filename
         )
 
 
+        # Save file
         file.save(
             file_path
         )
 
 
+        # Store path in database
         application.resume_path = file_path
 
         db.session.commit()
@@ -619,11 +649,13 @@ def download_resume(application_id):
 
     try:
 
+        # Get logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
 
+        # Get application
         application = (
             ApplicationService.get_application_by_id(
                 application_id,
@@ -632,6 +664,7 @@ def download_resume(application_id):
         )
 
 
+        # Check database path
         if not application.resume_path:
 
             return jsonify({
@@ -640,6 +673,7 @@ def download_resume(application_id):
             }), 404
 
 
+        # Check file
         if not os.path.exists(
             application.resume_path
         ):
@@ -650,12 +684,10 @@ def download_resume(application_id):
             }), 404
 
 
+        # Send PDF
         return send_file(
-
             application.resume_path,
-
             as_attachment=True
-
         )
 
 
@@ -670,4 +702,124 @@ def download_resume(application_id):
 
         return jsonify({
             "error": str(e)
+        }), 500
+
+
+# ==========================================
+# Extract Resume Text
+# GET /applications/<id>/resume/text
+# ==========================================
+
+@jobs_bp.route(
+    "/applications/<int:application_id>/resume/text",
+    methods=["GET"]
+)
+@jwt_required()
+def extract_resume_text(application_id):
+
+    try:
+
+        # Get logged-in user
+        user_id = int(
+            get_jwt_identity()
+        )
+
+
+        # Get application
+        application = (
+            ApplicationService.get_application_by_id(
+                application_id,
+                user_id
+            )
+        )
+
+
+        # Check database path
+        if not application.resume_path:
+
+            return jsonify({
+                "error":
+                    "No resume uploaded for this application"
+            }), 404
+
+
+        # Check file
+        if not os.path.exists(
+            application.resume_path
+        ):
+
+            return jsonify({
+                "error":
+                    "Resume file not found"
+            }), 404
+
+
+        # Read PDF
+        reader = PdfReader(
+            application.resume_path
+        )
+
+
+        # Extract text
+        resume_text = ""
+
+
+        for page in reader.pages:
+
+            text = page.extract_text()
+
+            if text:
+
+                resume_text += text + "\n"
+
+
+        # Remove unnecessary whitespace
+        resume_text = resume_text.strip()
+
+
+        # Check extraction result
+        if not resume_text:
+
+            return jsonify({
+
+                "message":
+                    "Resume PDF contains no extractable text",
+
+                "application_id":
+                    application_id,
+
+                "resume_text":
+                    ""
+
+            }), 200
+
+
+        return jsonify({
+
+            "message":
+                "Resume text extracted successfully!",
+
+            "application_id":
+                application_id,
+
+            "resume_text":
+                resume_text
+
+        }), 200
+
+
+    except ApplicationNotFound as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 404
+
+
+    except Exception as e:
+
+        return jsonify({
+
+            "error":
+                f"Failed to extract resume text: {str(e)}"
+
         }), 500

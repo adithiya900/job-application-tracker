@@ -1,4 +1,5 @@
 import logging
+import os
 
 from extensions import db
 from models.job import JobApplication, ApplicationStatus
@@ -27,7 +28,6 @@ class ApplicationService:
             data.get("company")
         )
 
-        # Check duplicate application
         existing_application = JobApplication.query.filter_by(
             company=data["company"],
             role=data["role"],
@@ -46,7 +46,6 @@ class ApplicationService:
                 "This job application already exists."
             )
 
-        # Create new application
         new_application = JobApplication(
             company=data["company"],
             role=data["role"],
@@ -71,7 +70,6 @@ class ApplicationService:
 
     # =========================
     # Get All Applications
-    # Search + Filter + Sorting + Pagination
     # =========================
     @staticmethod
     def get_all_applications(
@@ -88,14 +86,11 @@ class ApplicationService:
             user_id
         )
 
-        # Logged-in user's applications only
         query = JobApplication.query.filter_by(
             user_id=user_id
         )
 
-        # =========================
-        # Search by Company or Role
-        # =========================
+        # Search
         if search:
 
             search_term = f"%{search}%"
@@ -107,18 +102,14 @@ class ApplicationService:
                 )
             )
 
-        # =========================
-        # Filter by Status
-        # =========================
+        # Filter by status
         if status:
 
             query = query.filter(
                 JobApplication.status == status
             )
 
-        # =========================
         # Sorting
-        # =========================
         if sort == "oldest":
 
             query = query.order_by(
@@ -133,24 +124,15 @@ class ApplicationService:
 
         else:
 
-            # Default: newest first
             query = query.order_by(
                 JobApplication.applied_date.desc()
             )
 
-        # =========================
         # Pagination
-        # =========================
         pagination = query.paginate(
             page=page,
             per_page=per_page,
             error_out=False
-        )
-
-        logger.info(
-            "Page %s contains %s applications",
-            page,
-            len(pagination.items)
         )
 
         return pagination
@@ -162,23 +144,12 @@ class ApplicationService:
     @staticmethod
     def get_application_by_id(application_id, user_id):
 
-        logger.info(
-            "Fetching application ID: %s for user ID: %s",
-            application_id,
-            user_id
-        )
-
         application = JobApplication.query.filter_by(
             id=application_id,
             user_id=user_id
         ).first()
 
         if not application:
-
-            logger.warning(
-                "Application not found: %s",
-                application_id
-            )
 
             raise ApplicationNotFound(
                 f"Application with ID {application_id} not found."
@@ -192,11 +163,6 @@ class ApplicationService:
     # =========================
     @staticmethod
     def update_application(application_id, data, user_id):
-
-        logger.info(
-            "Updating application ID: %s",
-            application_id
-        )
 
         application = JobApplication.query.filter_by(
             id=application_id,
@@ -241,6 +207,7 @@ class ApplicationService:
 
     # =========================
     # Delete Application
+    # Delete Resume File (Cascade)
     # =========================
     @staticmethod
     def delete_application(application_id, user_id):
@@ -261,11 +228,40 @@ class ApplicationService:
                 f"Application with ID {application_id} not found."
             )
 
+        # =========================
+        # Delete Resume File
+        # =========================
+        if application.resume_path:
+
+            if os.path.exists(
+                application.resume_path
+            ):
+
+                os.remove(
+                    application.resume_path
+                )
+
+                logger.info(
+                    "Resume file deleted: %s",
+                    application.resume_path
+                )
+
+            else:
+
+                logger.warning(
+                    "Resume file not found: %s",
+                    application.resume_path
+                )
+
+        # =========================
+        # Delete Application from Database
+        # =========================
         db.session.delete(application)
+
         db.session.commit()
 
         logger.info(
-            "Application deleted successfully: %s",
+            "Application and resume deleted successfully: %s",
             application_id
         )
 
@@ -278,38 +274,27 @@ class ApplicationService:
     @staticmethod
     def get_dashboard_statistics(user_id):
 
-        logger.info(
-            "Fetching dashboard statistics for user ID: %s",
-            user_id
-        )
-
-        # Get logged-in user's applications
         applications = JobApplication.query.filter_by(
             user_id=user_id
         ).all()
 
-        # Total
         total_applications = len(applications)
 
-        # Applied
         applied = sum(
             1 for application in applications
             if application.status == ApplicationStatus.APPLIED
         )
 
-        # Interview
         interview = sum(
             1 for application in applications
             if application.status == ApplicationStatus.INTERVIEW
         )
 
-        # Rejected
         rejected = sum(
             1 for application in applications
             if application.status == ApplicationStatus.REJECTED
         )
 
-        # Offer
         offered = sum(
             1 for application in applications
             if application.status == ApplicationStatus.OFFER

@@ -850,6 +850,73 @@ def swagger_json():
 
 
             # =========================
+            # Resume Text Extraction
+            # =========================
+
+            "/applications/{application_id}/resume/text": {
+
+                "get": {
+
+                    "tags": [
+                        "Resume"
+                    ],
+
+                    "summary":
+                        "Extract text from application resume",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer",
+
+                            "description":
+                                "Application ID"
+                        }
+
+                    ],
+
+                    "produces": [
+                        "application/json"
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Resume text extracted successfully"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        },
+
+                        "404": {
+                            "description":
+                                "Resume or application not found"
+                        }
+
+                    }
+
+                }
+
+            },
+
+
+            # =========================
             # Dashboard Statistics
             # =========================
 
