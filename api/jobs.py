@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
+from marshmallow import ValidationError
 from PyPDF2 import PdfReader
 import os
 
@@ -11,6 +12,10 @@ from exceptions.application_exceptions import (
     DuplicateApplication
 )
 from models.job import ApplicationStatus
+from schemas.application_schema import (
+    CreateApplicationSchema,
+    UpdateApplicationSchema
+)
 
 
 # ==========================================
@@ -18,6 +23,14 @@ from models.job import ApplicationStatus
 # ==========================================
 
 jobs_bp = Blueprint("jobs", __name__)
+
+
+# ==========================================
+# Schemas
+# ==========================================
+
+create_application_schema = CreateApplicationSchema()
+update_application_schema = UpdateApplicationSchema()
 
 
 # ==========================================
@@ -56,58 +69,42 @@ def create_application():
         data = request.get_json()
 
         if not data:
-
             return jsonify({
                 "error": "No data provided"
             }), 400
 
+        # ==========================================
+        # Marshmallow Validation
+        # ==========================================
 
-        # Validate company
-        if not data.get("company"):
+        data = create_application_schema.load(data)
 
-            return jsonify({
-                "error": "Company is required"
-            }), 400
+        # ==========================================
+        # Convert status string to Enum
+        # ==========================================
 
+        if data.get("status"):
 
-        # Validate role
-        if not data.get("role"):
+            data["status"] = ApplicationStatus[
+                data["status"]
+            ]
 
-            return jsonify({
-                "error": "Role is required"
-            }), 400
+        # ==========================================
+        # Logged-in user
+        # ==========================================
 
-
-        # Get logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
-
-        # Convert status string to Enum
-        if data.get("status"):
-
-            try:
-
-                data["status"] = ApplicationStatus[
-                    data["status"].upper()
-                ]
-
-            except KeyError:
-
-                return jsonify({
-                    "error": "Invalid status"
-                }), 400
-
-
+        # ==========================================
         # Create application
-        application = (
-            ApplicationService.create_application(
-                data,
-                user_id
-            )
-        )
+        # ==========================================
 
+        application = ApplicationService.create_application(
+            data,
+            user_id
+        )
 
         return jsonify({
 
@@ -119,13 +116,30 @@ def create_application():
 
         }), 201
 
+    except ValidationError as e:
+
+        # Return the first Marshmallow validation
+        # message in the existing API error format
+
+        error_messages = []
+
+        for field_errors in e.messages.values():
+            error_messages.extend(field_errors)
+
+        return jsonify({
+
+            "error":
+                error_messages[0]
+                if error_messages
+                else "Validation Error"
+
+        }), 400
 
     except DuplicateApplication as e:
 
         return jsonify({
             "error": str(e)
         }), 409
-
 
     except Exception as e:
 
@@ -146,13 +160,10 @@ def get_all_applications():
 
     try:
 
-        # Logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
-
-        # Query parameters
         search = request.args.get("search")
 
         status = request.args.get("status")
@@ -162,8 +173,6 @@ def get_all_applications():
             "newest"
         ).lower()
 
-
-        # Pagination
         page = request.args.get(
             "page",
             1,
@@ -176,14 +185,15 @@ def get_all_applications():
             type=int
         )
 
-
+        # ==========================================
         # Validate sorting
+        # ==========================================
+
         allowed_sorts = [
             "newest",
             "oldest",
             "company"
         ]
-
 
         if sort not in allowed_sorts:
 
@@ -196,24 +206,23 @@ def get_all_applications():
 
             }), 400
 
-
+        # ==========================================
         # Validate pagination
-        if page < 1:
+        # ==========================================
 
+        if page < 1:
             page = 1
 
-
         if per_page < 1:
-
             per_page = 5
 
-
         if per_page > 100:
-
             per_page = 100
 
-
+        # ==========================================
         # Convert status to Enum
+        # ==========================================
+
         if status:
 
             try:
@@ -228,28 +237,26 @@ def get_all_applications():
                     "error": "Invalid status"
                 }), 400
 
-
+        # ==========================================
         # Get applications
-        pagination = (
-            ApplicationService.get_all_applications(
+        # ==========================================
 
-                user_id=user_id,
+        pagination = ApplicationService.get_all_applications(
 
-                search=search,
+            user_id=user_id,
 
-                status=status,
+            search=search,
 
-                sort=sort,
+            status=status,
 
-                page=page,
+            sort=sort,
 
-                per_page=per_page
+            page=page,
 
-            )
+            per_page=per_page
+
         )
 
-
-        # Serialize applications
         applications = [
 
             serialize_application(application)
@@ -257,7 +264,6 @@ def get_all_applications():
             for application in pagination.items
 
         ]
-
 
         return jsonify({
 
@@ -280,7 +286,6 @@ def get_all_applications():
             }
 
         }), 200
-
 
     except Exception as e:
 
@@ -307,18 +312,15 @@ def get_dashboard_statistics():
             get_jwt_identity()
         )
 
-
         statistics = (
             ApplicationService.get_dashboard_statistics(
                 user_id
             )
         )
 
-
         return jsonify(
             statistics
         ), 200
-
 
     except Exception as e:
 
@@ -345,29 +347,22 @@ def get_application(application_id):
             get_jwt_identity()
         )
 
-
         application = (
             ApplicationService.get_application_by_id(
-
                 application_id,
-
                 user_id
-
             )
         )
-
 
         return jsonify(
             serialize_application(application)
         ), 200
-
 
     except ApplicationNotFound as e:
 
         return jsonify({
             "error": str(e)
         }), 404
-
 
     except Exception as e:
 
@@ -392,49 +387,49 @@ def update_application(application_id):
 
         data = request.get_json()
 
-
         if not data:
 
             return jsonify({
                 "error": "No data provided"
             }), 400
 
+        # ==========================================
+        # Marshmallow Validation
+        # ==========================================
 
+        data = update_application_schema.load(data)
+
+        # ==========================================
+        # Convert status string to Enum
+        # ==========================================
+
+        if data.get("status"):
+
+            data["status"] = ApplicationStatus[
+                data["status"]
+            ]
+
+        # ==========================================
         # Logged-in user
+        # ==========================================
+
         user_id = int(
             get_jwt_identity()
         )
 
-
-        # Convert status string to Enum
-        if data.get("status"):
-
-            try:
-
-                data["status"] = ApplicationStatus[
-                    data["status"].upper()
-                ]
-
-            except KeyError:
-
-                return jsonify({
-                    "error": "Invalid status"
-                }), 400
-
-
+        # ==========================================
         # Update application
-        application = (
-            ApplicationService.update_application(
+        # ==========================================
 
-                application_id,
+        application = ApplicationService.update_application(
 
-                data,
+            application_id,
 
-                user_id
+            data,
 
-            )
+            user_id
+
         )
-
 
         return jsonify({
 
@@ -446,13 +441,30 @@ def update_application(application_id):
 
         }), 200
 
+    except ValidationError as e:
+
+        # Return the first Marshmallow validation
+        # message in the existing API error format
+
+        error_messages = []
+
+        for field_errors in e.messages.values():
+            error_messages.extend(field_errors)
+
+        return jsonify({
+
+            "error":
+                error_messages[0]
+                if error_messages
+                else "Validation Error"
+
+        }), 400
 
     except ApplicationNotFound as e:
 
         return jsonify({
             "error": str(e)
         }), 404
-
 
     except Exception as e:
 
@@ -479,10 +491,6 @@ def delete_application(application_id):
             get_jwt_identity()
         )
 
-
-        # ApplicationService handles:
-        # 1. Application deletion
-        # 2. Resume file deletion
         ApplicationService.delete_application(
 
             application_id,
@@ -491,21 +499,18 @@ def delete_application(application_id):
 
         )
 
-
         return jsonify({
 
             "message":
-                "Application and resume deleted successfully!"
+                "Application deleted successfully!"
 
         }), 200
-
 
     except ApplicationNotFound as e:
 
         return jsonify({
             "error": str(e)
         }), 404
-
 
     except Exception as e:
 
@@ -528,40 +533,30 @@ def upload_resume(application_id):
 
     try:
 
-        # Get logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
-
-        # Check resume file
         if "resume" not in request.files:
 
             return jsonify({
                 "error": "Resume file is required"
             }), 400
 
-
         file = request.files["resume"]
 
-
-        # Check filename
         if file.filename == "":
 
             return jsonify({
                 "error": "No file selected"
             }), 400
 
-
-        # Allow only PDF
         if not file.filename.lower().endswith(".pdf"):
 
             return jsonify({
                 "error": "Only PDF files are allowed"
             }), 400
 
-
-        # Get application and verify ownership
         application = (
             ApplicationService.get_application_by_id(
                 application_id,
@@ -569,8 +564,6 @@ def upload_resume(application_id):
             )
         )
 
-
-        # Upload folder
         upload_folder = "uploads"
 
         os.makedirs(
@@ -578,37 +571,24 @@ def upload_resume(application_id):
             exist_ok=True
         )
 
-
-        # Secure filename
         original_filename = secure_filename(
             file.filename
         )
 
-
-        # Unique filename
         filename = (
             f"{application_id}_{original_filename}"
         )
 
-
-        # Complete path
         file_path = os.path.join(
             upload_folder,
             filename
         )
 
+        file.save(file_path)
 
-        # Save file
-        file.save(
-            file_path
-        )
-
-
-        # Store path in database
         application.resume_path = file_path
 
         db.session.commit()
-
 
         return jsonify({
 
@@ -620,13 +600,11 @@ def upload_resume(application_id):
 
         }), 200
 
-
     except ApplicationNotFound as e:
 
         return jsonify({
             "error": str(e)
         }), 404
-
 
     except Exception as e:
 
@@ -649,13 +627,10 @@ def download_resume(application_id):
 
     try:
 
-        # Get logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
-
-        # Get application
         application = (
             ApplicationService.get_application_by_id(
                 application_id,
@@ -663,8 +638,6 @@ def download_resume(application_id):
             )
         )
 
-
-        # Check database path
         if not application.resume_path:
 
             return jsonify({
@@ -672,8 +645,6 @@ def download_resume(application_id):
                     "No resume uploaded for this application"
             }), 404
 
-
-        # Check file
         if not os.path.exists(
             application.resume_path
         ):
@@ -683,20 +654,16 @@ def download_resume(application_id):
                     "Resume file not found"
             }), 404
 
-
-        # Send PDF
         return send_file(
             application.resume_path,
             as_attachment=True
         )
-
 
     except ApplicationNotFound as e:
 
         return jsonify({
             "error": str(e)
         }), 404
-
 
     except Exception as e:
 
@@ -719,13 +686,10 @@ def extract_resume_text(application_id):
 
     try:
 
-        # Get logged-in user
         user_id = int(
             get_jwt_identity()
         )
 
-
-        # Get application
         application = (
             ApplicationService.get_application_by_id(
                 application_id,
@@ -733,8 +697,6 @@ def extract_resume_text(application_id):
             )
         )
 
-
-        # Check database path
         if not application.resume_path:
 
             return jsonify({
@@ -742,8 +704,6 @@ def extract_resume_text(application_id):
                     "No resume uploaded for this application"
             }), 404
 
-
-        # Check file
         if not os.path.exists(
             application.resume_path
         ):
@@ -753,31 +713,21 @@ def extract_resume_text(application_id):
                     "Resume file not found"
             }), 404
 
-
-        # Read PDF
         reader = PdfReader(
             application.resume_path
         )
 
-
-        # Extract text
         resume_text = ""
-
 
         for page in reader.pages:
 
             text = page.extract_text()
 
             if text:
-
                 resume_text += text + "\n"
 
-
-        # Remove unnecessary whitespace
         resume_text = resume_text.strip()
 
-
-        # Check extraction result
         if not resume_text:
 
             return jsonify({
@@ -793,7 +743,6 @@ def extract_resume_text(application_id):
 
             }), 200
 
-
         return jsonify({
 
             "message":
@@ -807,13 +756,11 @@ def extract_resume_text(application_id):
 
         }), 200
 
-
     except ApplicationNotFound as e:
 
         return jsonify({
             "error": str(e)
         }), 404
-
 
     except Exception as e:
 
