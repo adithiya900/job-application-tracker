@@ -115,7 +115,8 @@ def login():
         "refresh_token": refresh_token,
         "user": {
             "id": user.id,
-            "name": user.name
+            "name": user.name,
+            "email": user.email
         }
     }), 200
 
