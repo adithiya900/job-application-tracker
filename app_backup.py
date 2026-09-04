@@ -13,6 +13,10 @@ from flask_swagger_ui import get_swaggerui_blueprint
 # Error Handlers
 from errors.handlers import register_error_handlers
 
+# Import models
+from models.job import JobApplication
+from models.user import User
+
 # Import Blueprints
 from api.jobs import jobs_bp
 from api.auth import auth_bp
@@ -1085,6 +1089,820 @@ def swagger_json():
                     }
 
                 }
+
+            }
+
+        }
+
+    }
+
+    return jsonify(swagger_data)
+
+
+            # =========================
+            # Login
+            # =========================
+
+            "/login": {
+
+                "post": {
+
+                    "tags": [
+                        "Authentication"
+                    ],
+
+                    "summary": "Login user",
+
+                    "parameters": [
+
+                        {
+                            "name": "body",
+
+                            "in": "body",
+
+                            "required": True,
+
+                            "schema": {
+
+                                "type": "object",
+
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+
+                                "properties": {
+
+                                    "email": {
+                                        "type": "string",
+                                        "example":
+                                            "adithiya@email.com"
+                                    },
+
+                                    "password": {
+                                        "type": "string",
+                                        "example":
+                                            "password123"
+                                    }
+
+                                }
+
+                            }
+
+                        }
+
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Login successful"
+                        },
+
+                        "401": {
+                            "description":
+                                "Invalid credentials"
+                        }
+
+                    }
+
+                }
+
+            },
+
+            # =========================
+            # Refresh Access Token
+            # =========================
+
+            "/refresh": {
+
+                "post": {
+
+                    "tags": [
+                        "Authentication"
+                    ],
+
+                    "summary": "Refresh access token",
+
+                    "description":
+                        "Generate a new access token using a valid refresh token.",
+
+                    "security": [
+                        {
+                            "Bearer": []
+                        }
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Access token refreshed successfully"
+                        },
+
+                        "401": {
+                            "description":
+                                "Refresh token missing, invalid or expired"
+                        }
+
+                    }
+
+                }
+
+            },
+
+
+            # =========================
+            # Logout
+            # =========================
+
+            "/logout": {
+
+                "post": {
+
+                    "tags": [
+                        "Authentication"
+                    ],
+
+                    "summary": "Logout user",
+
+                    "description":
+                        "Revoke the current access token and logout the user.",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Logout successful! Token revoked."
+                        },
+
+                        "401": {
+                            "description":
+                                "Authorization token is missing or invalid"
+                        }
+
+                    }
+
+                }
+
+            },
+            # =========================
+            # Applications
+            # =========================
+
+            "/applications": {
+
+                "get": {
+
+                    "tags": [
+                        "Applications"
+                    ],
+
+                    "summary":
+                        "Get all applications",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name": "search",
+                            "in": "query",
+                            "type": "string",
+                            "description":
+                                "Search company or role"
+                        },
+
+                        {
+                            "name": "status",
+                            "in": "query",
+                            "type": "string",
+                            "description":
+                                "Application status"
+                        },
+
+                        {
+                            "name": "sort",
+                            "in": "query",
+                            "type": "string",
+                            "default": "newest"
+                        },
+
+                        {
+                            "name": "page",
+                            "in": "query",
+                            "type": "integer",
+                            "default": 1
+                        },
+
+                        {
+                            "name": "per_page",
+                            "in": "query",
+                            "type": "integer",
+                            "default": 5
+                        }
+
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Applications retrieved successfully"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        }
+
+                    }
+
+                },
+
+
+                "post": {
+
+                    "tags": [
+                        "Applications"
+                    ],
+
+                    "summary":
+                        "Create a new job application",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name": "body",
+
+                            "in": "body",
+
+                            "required": True,
+
+                            "schema": {
+
+                                "type": "object",
+
+                                "required": [
+                                    "company",
+                                    "role"
+                                ],
+
+                                "properties": {
+
+                                    "company": {
+                                        "type": "string",
+                                        "example": "Google"
+                                    },
+
+                                    "role": {
+                                        "type": "string",
+                                        "example":
+                                            "Software Engineer"
+                                    },
+
+                                    "status": {
+                                        "type": "string",
+                                        "example": "APPLIED"
+                                    },
+
+                                    "notes": {
+                                        "type": "string",
+                                        "example":
+                                            "Applied through careers page"
+                                    }
+
+                                }
+
+                            }
+
+                        }
+
+                    ],
+
+                    "responses": {
+
+                        "201": {
+                            "description":
+                                "Application created successfully"
+                        },
+
+                        "400": {
+                            "description":
+                                "Invalid input"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        },
+
+                        "409": {
+                            "description":
+                                "Duplicate application"
+                        }
+
+                    }
+
+                }
+
+            },
+
+
+            # =========================
+            # Application By ID
+            # =========================
+
+            "/applications/{application_id}": {
+
+                "get": {
+
+                    "tags": [
+                        "Applications"
+                    ],
+
+                    "summary":
+                        "Get application by ID",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer"
+
+                        }
+
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Application found"
+                        },
+
+                        "404": {
+                            "description":
+                                "Application not found"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        }
+
+                    }
+
+                },
+
+
+                "put": {
+
+                    "tags": [
+                        "Applications"
+                    ],
+
+                    "summary":
+                        "Update application",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer"
+
+                        },
+
+                        {
+                            "name": "body",
+
+                            "in": "body",
+
+                            "required": True,
+
+                            "schema": {
+
+                                "type": "object",
+
+                                "properties": {
+
+                                    "company": {
+                                        "type": "string"
+                                    },
+
+                                    "role": {
+                                        "type": "string"
+                                    },
+
+                                    "status": {
+                                        "type": "string",
+                                        "example":
+                                            "INTERVIEW"
+                                    },
+
+                                    "notes": {
+                                        "type": "string"
+                                    }
+
+                                }
+
+                            }
+
+                        }
+
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Application updated successfully"
+                        },
+
+                        "404": {
+                            "description":
+                                "Application not found"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        }
+
+                    }
+
+                },
+
+
+                "delete": {
+
+                    "tags": [
+                        "Applications"
+                    ],
+
+                    "summary":
+                        "Delete application",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer"
+
+                        }
+
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Application deleted successfully"
+                        },
+
+                        "404": {
+                            "description":
+                                "Application not found"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        }
+
+                    }
+
+                }
+
+            },
+
+
+            # =========================
+            # Resume Upload & Download
+            # =========================
+
+            "/applications/{application_id}/resume": {
+
+                # Upload Resume
+                "post": {
+
+                    "tags": [
+                        "Resume"
+                    ],
+
+                    "summary":
+                        "Upload resume for an application",
+
+                    "consumes": [
+                        "multipart/form-data"
+                    ],
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer",
+
+                            "description":
+                                "Application ID"
+                        },
+
+                        {
+                            "name": "resume",
+
+                            "in": "formData",
+
+                            "required": True,
+
+                            "type": "file",
+
+                            "description":
+                                "Upload PDF resume"
+                        }
+
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Resume uploaded successfully"
+                        },
+
+                        "400": {
+                            "description":
+                                "Invalid or missing resume file"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        },
+
+                        "404": {
+                            "description":
+                                "Application not found"
+                        }
+
+                    }
+
+                },
+
+
+                # Download Resume
+                "get": {
+
+                    "tags": [
+                        "Resume"
+                    ],
+
+                    "summary":
+                        "Download application resume",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer",
+
+                            "description":
+                                "Application ID"
+                        }
+
+                    ],
+
+                    "produces": [
+                        "application/pdf"
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Resume downloaded successfully"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        },
+
+                        "404": {
+                            "description":
+                                "Resume or application not found"
+                        }
+
+                    }
+
+                }
+
+            },
+
+
+            # =========================
+            # Resume Text Extraction
+            # =========================
+
+            "/applications/{application_id}/resume/text": {
+
+                "get": {
+
+                    "tags": [
+                        "Resume"
+                    ],
+
+                    "summary":
+                        "Extract text from application resume",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer",
+
+                            "description":
+                                "Application ID"
+                        }
+
+                    ],
+
+                    "produces": [
+                        "application/json"
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Resume text extracted successfully"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        },
+
+                        "404": {
+                            "description":
+                                "Resume or application not found"
+                        }
+
+                    }
+
+                }
+
+            },
+
+
+            # =========================
+            # Dashboard Statistics
+            # =========================
+
+            "/dashboard/statistics": {
+
+                "get": {
+
+                    "tags": [
+                        "Dashboard"
+                    ],
+
+                    "summary":
+                        "Get dashboard statistics",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Statistics retrieved successfully"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        }
+
+                    }
+
+                }
+
+            }
+
+        },
+
+
+        # =========================
+        # JWT Authorization
+        # =========================
+
+        "securityDefinitions": {
+
+            "BearerAuth": {
+
+                "type": "apiKey",
+
+                "name": "Authorization",
+
+                "in": "header",
+
+                "description": (
+                    "Enter your JWT token like this: "
+                    "Bearer <your_token>"
+                )
 
             }
 
