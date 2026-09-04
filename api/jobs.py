@@ -61,6 +61,7 @@ def serialize_application(application):
 # ==========================================
 
 @jobs_bp.route("/applications", methods=["POST"])
+@jobs_bp.route("/api/applications", methods=["POST"])
 @jwt_required()
 def create_application():
 
@@ -155,6 +156,7 @@ def create_application():
 # ==========================================
 
 @jobs_bp.route("/applications", methods=["GET"])
+@jobs_bp.route("/api/applications", methods=["GET"])
 @jwt_required()
 def get_all_applications():
 
@@ -265,7 +267,7 @@ def get_all_applications():
 
         ]
 
-        return jsonify({
+        response = jsonify({
 
             "applications": applications,
 
@@ -285,7 +287,16 @@ def get_all_applications():
 
             }
 
-        }), 200
+        })
+
+        response.headers["X-Total-Count"] = str(pagination.total)
+        response.headers["X-Page"] = str(pagination.page)
+        response.headers["X-Per-Page"] = str(pagination.per_page)
+        response.headers["X-Total-Pages"] = str(pagination.pages)
+        response.headers["X-Has-Next"] = str(pagination.has_next).lower()
+        response.headers["X-Has-Prev"] = str(pagination.has_prev).lower()
+
+        return response, 200
 
     except Exception as e:
 
@@ -299,6 +310,8 @@ def get_all_applications():
 # GET /dashboard/statistics
 # ==========================================
 
+@jobs_bp.route("/applications/stats", methods=["GET"])
+@jobs_bp.route("/api/applications/stats", methods=["GET"])
 @jobs_bp.route(
     "/dashboard/statistics",
     methods=["GET"]
@@ -336,6 +349,10 @@ def get_dashboard_statistics():
 
 @jobs_bp.route(
     "/applications/<int:application_id>",
+    methods=["GET"]
+)
+@jobs_bp.route(
+    "/api/applications/<int:application_id>",
     methods=["GET"]
 )
 @jwt_required()
@@ -378,7 +395,11 @@ def get_application(application_id):
 
 @jobs_bp.route(
     "/applications/<int:application_id>",
-    methods=["PUT"]
+    methods=["PUT", "PATCH"]
+)
+@jobs_bp.route(
+    "/api/applications/<int:application_id>",
+    methods=["PUT", "PATCH"]
 )
 @jwt_required()
 def update_application(application_id):
@@ -482,6 +503,10 @@ def update_application(application_id):
     "/applications/<int:application_id>",
     methods=["DELETE"]
 )
+@jobs_bp.route(
+    "/api/applications/<int:application_id>",
+    methods=["DELETE"]
+)
 @jwt_required()
 def delete_application(application_id):
 
@@ -526,6 +551,10 @@ def delete_application(application_id):
 
 @jobs_bp.route(
     "/applications/<int:application_id>/resume",
+    methods=["POST"]
+)
+@jobs_bp.route(
+    "/api/applications/<int:application_id>/resume",
     methods=["POST"]
 )
 @jwt_required()
@@ -622,6 +651,10 @@ def upload_resume(application_id):
     "/applications/<int:application_id>/resume",
     methods=["GET"]
 )
+@jobs_bp.route(
+    "/api/applications/<int:application_id>/resume",
+    methods=["GET"]
+)
 @jwt_required()
 def download_resume(application_id):
 
@@ -679,6 +712,10 @@ def download_resume(application_id):
 
 @jobs_bp.route(
     "/applications/<int:application_id>/resume/text",
+    methods=["GET"]
+)
+@jobs_bp.route(
+    "/api/applications/<int:application_id>/resume/text",
     methods=["GET"]
 )
 @jwt_required()

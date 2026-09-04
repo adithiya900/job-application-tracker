@@ -195,6 +195,9 @@ class ApplicationService:
             application.notes
         )
 
+        if "applied_date" in data:
+            application.applied_date = data["applied_date"]
+
         db.session.commit()
 
         logger.info(
@@ -285,6 +288,11 @@ class ApplicationService:
             if application.status == ApplicationStatus.APPLIED
         )
 
+        phone_screen = sum(
+            1 for application in applications
+            if application.status == ApplicationStatus.PHONE_SCREEN
+        )
+
         interview = sum(
             1 for application in applications
             if application.status == ApplicationStatus.INTERVIEW
@@ -303,7 +311,15 @@ class ApplicationService:
         return {
             "total_applications": total_applications,
             "applied": applied,
+            "phone_screen": phone_screen,
             "interview": interview,
             "rejected": rejected,
-            "offered": offered
+            "offered": offered,
+            "by_status": {
+                "APPLIED": applied,
+                "PHONE_SCREEN": phone_screen,
+                "INTERVIEW": interview,
+                "OFFER": offered,
+                "REJECTED": rejected
+            }
         }

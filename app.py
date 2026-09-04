@@ -529,7 +529,33 @@ def swagger_json():
 
                         "200": {
                             "description":
-                                "Applications retrieved successfully"
+                                "Applications retrieved successfully",
+                            "headers": {
+                                "X-Total-Count": {
+                                    "type": "integer",
+                                    "description": "Total number of applications matching query"
+                                },
+                                "X-Page": {
+                                    "type": "integer",
+                                    "description": "Current page number"
+                                },
+                                "X-Per-Page": {
+                                    "type": "integer",
+                                    "description": "Number of applications per page"
+                                },
+                                "X-Total-Pages": {
+                                    "type": "integer",
+                                    "description": "Total number of pages"
+                                },
+                                "X-Has-Next": {
+                                    "type": "string",
+                                    "description": "Whether a next page exists (true/false)"
+                                },
+                                "X-Has-Prev": {
+                                    "type": "string",
+                                    "description": "Whether a previous page exists (true/false)"
+                                }
+                            }
                         },
 
                         "401": {
@@ -766,6 +792,112 @@ def swagger_json():
                         "200": {
                             "description":
                                 "Application updated successfully"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
+                        },
+
+                        "404": {
+                            "description":
+                                "Application not found"
+                        }
+
+                    }
+
+                },
+
+
+                "patch": {
+
+                    "tags": [
+                        "Applications"
+                    ],
+
+                    "summary":
+                        "Partially update application",
+
+                    "description":
+                        "Partially update one or more fields of an existing application. Fields not included remain unchanged. Also available at /api/applications/{application_id}.",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+
+                        {
+                            "name":
+                                "application_id",
+
+                            "in": "path",
+
+                            "required": True,
+
+                            "type": "integer"
+
+                        },
+
+                        {
+                            "name": "body",
+
+                            "in": "body",
+
+                            "required": True,
+
+                            "schema": {
+
+                                "type": "object",
+
+                                "properties": {
+
+                                    "company": {
+                                        "type": "string",
+                                        "example": "Google"
+                                    },
+
+                                    "role": {
+                                        "type": "string",
+                                        "example": "Senior Software Engineer"
+                                    },
+
+                                    "status": {
+                                        "type": "string",
+                                        "example": "INTERVIEW"
+                                    },
+
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Round 1 passed"
+                                    },
+
+                                    "applied_date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-09-04"
+                                    }
+
+                                }
+
+                            }
+
+                        }
+
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Application updated successfully"
+                        },
+
+                        "400": {
+                            "description":
+                                "Validation Error / Invalid input"
                         },
 
                         "401": {
@@ -1040,6 +1172,49 @@ def swagger_json():
                         "404": {
                             "description":
                                 "Resume or application not found"
+                        }
+
+                    }
+
+                }
+
+            },
+
+
+            # =========================
+            # Applications Statistics
+            # =========================
+
+            "/applications/stats": {
+
+                "get": {
+
+                    "tags": [
+                        "Applications"
+                    ],
+
+                    "summary":
+                        "Get application statistics (counts by status)",
+
+                    "description":
+                        "Returns total applications and counts broken down by status. Also available at /api/applications/stats.",
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description":
+                                "Application statistics retrieved successfully"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized"
                         }
 
                     }
