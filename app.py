@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import os
 
 from flask_jwt_extended import get_jwt
-from extensions import db, bcrypt, jwt
+from extensions import db, bcrypt, jwt, cache
 from flask_migrate import Migrate
 from flask_swagger_ui import get_swaggerui_blueprint
 
@@ -49,6 +49,26 @@ app.config["JWT_SECRET_KEY"] = os.getenv(
 
 
 # =========================
+# Flask-Caching Configuration
+# =========================
+
+app.config["CACHE_TYPE"] = "RedisCache"
+app.config["CACHE_REDIS_URL"] = os.getenv(
+    "REDIS_URL", "redis://localhost:6379/0"
+)
+app.config["CACHE_DEFAULT_TIMEOUT"] = 1800
+
+
+# =========================
+# Adzuna Configuration
+# =========================
+
+app.config["ADZUNA_APP_ID"] = os.getenv("ADZUNA_APP_ID")
+app.config["ADZUNA_APP_KEY"] = os.getenv("ADZUNA_APP_KEY")
+app.config["ADZUNA_COUNTRY"] = os.getenv("ADZUNA_COUNTRY", "in")
+
+
+# =========================
 # Initialize Extensions
 # =========================
 db.init_app(app)
@@ -56,6 +76,8 @@ db.init_app(app)
 bcrypt.init_app(app)
 
 jwt.init_app(app)
+
+cache.init_app(app)
 
 migrate = Migrate(app, db)
 
@@ -1255,6 +1277,140 @@ def swagger_json():
                         "401": {
                             "description":
                                 "Unauthorized"
+                        }
+
+                    }
+
+                }
+
+            },
+
+
+            # =========================
+            # Job Search (Day 9)
+            # =========================
+
+            "/api/jobs/search": {
+
+                "get": {
+
+                    "tags": [
+                        "Job Search"
+                    ],
+
+                    "summary":
+                        "Search external jobs via Adzuna API",
+
+                    "description": (
+                        "Search for jobs using the Adzuna API. "
+                        "Results are cached in Redis for 30 minutes. "
+                        "Requires JWT authentication."
+                    ),
+
+                    "security": [
+                        {
+                            "BearerAuth": []
+                        }
+                    ],
+
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "required": True,
+                            "description": "Job search query (e.g. python, data engineer)",
+                            "schema": {
+                                "type": "string",
+                                "example": "python"
+                            }
+                        },
+                        {
+                            "name": "location",
+                            "in": "query",
+                            "required": False,
+                            "description": "Location filter (e.g. chennai, bangalore)",
+                            "schema": {
+                                "type": "string",
+                                "example": "chennai"
+                            }
+                        },
+                        {
+                            "name": "page",
+                            "in": "query",
+                            "required": False,
+                            "description": "Page number (default: 1)",
+                            "schema": {
+                                "type": "integer",
+                                "default": 1
+                            }
+                        },
+                        {
+                            "name": "per_page",
+                            "in": "query",
+                            "required": False,
+                            "description": "Results per page (default: 5, max: 50)",
+                            "schema": {
+                                "type": "integer",
+                                "default": 5
+                            }
+                        }
+                    ],
+
+                    "responses": {
+
+                        "200": {
+                            "description": "Jobs retrieved successfully",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "query": {"type": "string"},
+                                            "location": {"type": "string"},
+                                            "count": {"type": "integer"},
+                                            "cached": {"type": "boolean"},
+                                            "source": {"type": "string", "enum": ["cache", "api"]},
+                                            "jobs": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "title": {"type": "string"},
+                                                        "company": {"type": "string"},
+                                                        "location": {"type": "string"},
+                                                        "salary_min": {"type": "number"},
+                                                        "salary_max": {"type": "number"},
+                                                        "salary_range": {"type": "string"},
+                                                        "description": {"type": "string"},
+                                                        "redirect_url": {"type": "string"},
+                                                        "created": {"type": "string"}
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+
+                        "400": {
+                            "description":
+                                "Bad request - missing required parameter q"
+                        },
+
+                        "401": {
+                            "description":
+                                "Unauthorized - JWT token missing or invalid"
+                        },
+
+                        "502": {
+                            "description":
+                                "Bad Gateway - Adzuna API returned an error"
+                        },
+
+                        "503": {
+                            "description":
+                                "Service Unavailable - Adzuna credentials not configured"
                         }
 
                     }

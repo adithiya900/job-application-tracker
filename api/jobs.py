@@ -16,6 +16,11 @@ from schemas.application_schema import (
     CreateApplicationSchema,
     UpdateApplicationSchema
 )
+from services.job_search_service import (
+    JobSearchService,
+    MissingCredentialsError,
+    ExternalAPIError
+)
 
 
 # ==========================================
@@ -807,3 +812,67 @@ def extract_resume_text(application_id):
                 f"Failed to extract resume text: {str(e)}"
 
         }), 500
+
+
+
+# ==========================================
+# Job Search (External: Adzuna API)
+# GET /api/jobs/search
+# ==========================================
+
+@jobs_bp.route("/jobs/search", methods=["GET"])
+@jobs_bp.route("/api/jobs/search", methods=["GET"])
+@jwt_required()
+def search_jobs():
+
+    q = request.args.get("q", "").strip()
+
+    if not q:
+
+        return jsonify({
+            "error": "Query parameter 'q' is required"
+        }), 400
+
+    location = request.args.get("location", "").strip()
+
+    page = request.args.get("page", 1, type=int)
+
+    per_page = request.args.get("per_page", 5, type=int)
+
+    if page < 1:
+        page = 1
+
+    if per_page < 1:
+        per_page = 5
+
+    if per_page > 50:
+        per_page = 50
+
+    try:
+
+        result = JobSearchService.search_jobs(
+            q=q,
+            location=location,
+            page=page,
+            per_page=per_page
+        )
+
+        return jsonify(result), 200
+
+    except MissingCredentialsError as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 503
+
+    except ExternalAPIError as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 502
+
+    except Exception as e:
+
+        return jsonify({
+            "error": f"Unexpected error during job search: {str(e)}"
+        }), 500

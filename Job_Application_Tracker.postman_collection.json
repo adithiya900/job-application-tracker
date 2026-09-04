@@ -757,6 +757,148 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Day 9 - Job Search (Adzuna API)",
+			"item": [
+				{
+					"name": "Search Jobs",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"var json = pm.response.json();",
+									"",
+									"pm.test('Response has jobs array', function () {",
+									"    pm.expect(json).to.have.property('jobs');",
+									"    pm.expect(json.jobs).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Response has cached field', function () {",
+									"    pm.expect(json).to.have.property('cached');",
+									"});",
+									"",
+									"pm.test('Response has source field', function () {",
+									"    pm.expect(json).to.have.property('source');",
+									"    pm.expect(['cache', 'api']).to.include(json.source);",
+									"});",
+									"",
+									"pm.test('Response has count field', function () {",
+									"    pm.expect(json).to.have.property('count');",
+									"});",
+									"",
+									"if (json.jobs.length > 0) {",
+									"    var job = json.jobs[0];",
+									"    pm.test('First job has title', function () {",
+									"        pm.expect(job).to.have.property('title');",
+									"    });",
+									"    pm.test('First job has company', function () {",
+									"        pm.expect(job).to.have.property('company');",
+									"    });",
+									"    pm.test('First job has salary_range', function () {",
+									"        pm.expect(job).to.have.property('salary_range');",
+									"    });",
+									"    pm.test('First job has redirect_url', function () {",
+									"        pm.expect(job).to.have.property('redirect_url');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/jobs/search?q=python&location=chennai",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"jobs",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "python"
+								},
+								{
+									"key": "location",
+									"value": "chennai"
+								}
+							]
+						},
+						"description": "Search for jobs using Adzuna API. Results are cached for 30 minutes. Requires JWT authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Jobs - Missing q (400)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 400 when q is missing', function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test('Response has error field', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property('error');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/jobs/search",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"jobs",
+								"search"
+							]
+						},
+						"description": "Should return 400 when q parameter is missing."
+					},
+					"response": []
+				}
+			]
 		}
 	]
 }

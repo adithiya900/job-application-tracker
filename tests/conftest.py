@@ -12,6 +12,14 @@ def test_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+    # Use in-memory cache in tests — does not require Redis
+    app.config["CACHE_TYPE"] = "SimpleCache"
+    app.config["CACHE_DEFAULT_TIMEOUT"] = 1800
+
+    # Re-initialize cache with SimpleCache to avoid Redis in tests
+    from extensions import cache
+    cache.init_app(app)
+
     with app.app_context():
 
         db.drop_all()
@@ -25,6 +33,8 @@ def test_app():
 
         db.session.remove()
         db.drop_all()
+
+
 
 
 @pytest.fixture
