@@ -4,9 +4,10 @@ from models.token_blocklist import TokenBlocklist
 from flask import Flask, jsonify
 from dotenv import load_dotenv
 import os
+from flask_mail import Message
 
 from flask_jwt_extended import get_jwt
-from extensions import db, bcrypt, jwt, cache
+from extensions import db, bcrypt, jwt, cache, mail
 from flask_migrate import Migrate
 from flask_swagger_ui import get_swaggerui_blueprint
 
@@ -69,6 +70,19 @@ app.config["ADZUNA_COUNTRY"] = os.getenv("ADZUNA_COUNTRY", "in")
 
 
 # =========================
+# Flask-Mail Configuration
+# =========================
+
+app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+app.config["MAIL_PORT"] = int(os.getenv("MAIL_PORT", 587))
+app.config["MAIL_USE_TLS"] = os.getenv("MAIL_USE_TLS", "True").lower() in ("true", "1", "t")
+app.config["MAIL_USE_SSL"] = os.getenv("MAIL_USE_SSL", "False").lower() in ("true", "1", "t")
+app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
+app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
+app.config["MAIL_DEFAULT_SENDER"] = os.getenv("MAIL_DEFAULT_SENDER")
+
+
+# =========================
 # Initialize Extensions
 # =========================
 db.init_app(app)
@@ -78,6 +92,8 @@ bcrypt.init_app(app)
 jwt.init_app(app)
 
 cache.init_app(app)
+
+mail.init_app(app)
 
 migrate = Migrate(app, db)
 
@@ -1488,9 +1504,56 @@ def check_user(user_id):
 
 
 # =========================
+# Test Email Route
+# =========================
+
+@app.route("/test-email", methods=["GET"])
+def test_email():
+
+    try:
+        recipient = app.config.get("MAIL_USERNAME")
+
+        if not recipient:
+            return jsonify({
+                "error": "MAIL_USERNAME not configured in environment"
+            }), 500
+
+        msg = Message(
+            subject="Job Application Tracker - Test Email",
+            recipients=[recipient],
+            body="This is a test email sent from the Job Application Tracker Flask application to verify SMTP configuration.",
+            sender=app.config.get("MAIL_DEFAULT_SENDER") or recipient
+        )
+
+        mail.send(msg)
+
+        return jsonify({
+            "message": "Test email sent successfully!"
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to send email",
+            "details": str(e)
+        }), 500
+
+
+# =========================
 # Run Application
 # =========================
 
 if __name__ == "__main__":
+
+    # Safe Mail Configuration Debug Output
+    print("=" * 40)
+    print("Email Configuration Status:")
+    print(f"MAIL_SERVER: {app.config.get('MAIL_SERVER')}")
+    print(f"MAIL_PORT: {app.config.get('MAIL_PORT')}")
+    print(f"MAIL_USE_TLS: {app.config.get('MAIL_USE_TLS')}")
+    print(f"MAIL_USE_SSL: {app.config.get('MAIL_USE_SSL')}")
+    print(f"MAIL_USERNAME configured: {bool(app.config.get('MAIL_USERNAME'))}")
+    print(f"MAIL_PASSWORD configured: {bool(app.config.get('MAIL_PASSWORD'))}")
+    print(f"MAIL_DEFAULT_SENDER: {app.config.get('MAIL_DEFAULT_SENDER')}")
+    print("=" * 40)
 
     app.run(debug=True)
