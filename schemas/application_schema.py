@@ -49,6 +49,11 @@ class CreateApplicationSchema(Schema):
         required=False
     )
 
+    interview_at = fields.DateTime(
+        required=False,
+        allow_none=True
+    )
+
     @validates("company")
     def validate_company(self, value, **kwargs):
         if not value.strip():
@@ -91,6 +96,11 @@ class UpdateApplicationSchema(Schema):
 
     applied_date = fields.Date(
         required=False
+    )
+
+    interview_at = fields.DateTime(
+        required=False,
+        allow_none=True
     )
 
     @validates("company")

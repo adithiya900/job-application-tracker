@@ -54,6 +54,11 @@ def serialize_application(application):
             if application.applied_date
             else None
         ),
+        "interview_at": (
+            application.interview_at.isoformat()
+            if application.interview_at
+            else None
+        ),
         "notes": application.notes,
         "user_id": application.user_id,
         "resume_path": application.resume_path
@@ -875,4 +880,4 @@ def search_jobs():
 
         return jsonify({
             "error": f"Unexpected error during job search: {str(e)}"
-        }), 500
+        }), 500

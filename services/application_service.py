@@ -57,6 +57,7 @@ class ApplicationService:
                 "status",
                 ApplicationStatus.APPLIED
             ),
+            interview_at=data.get("interview_at"),
             notes=data.get("notes"),
             user_id=user_id
         )
@@ -201,6 +202,11 @@ class ApplicationService:
             "status",
             application.status
         )
+
+        if "interview_at" in data:
+
+            application.interview_at = data["interview_at"]
+            application.interview_reminder_sent_at = None
 
         application.notes = data.get(
             "notes",

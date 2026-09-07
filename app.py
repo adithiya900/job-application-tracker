@@ -17,6 +17,8 @@ from errors.handlers import register_error_handlers
 # Import Blueprints
 from api.jobs import jobs_bp
 from api.auth import auth_bp
+from api.notifications import notifications_bp
+from scheduler.reminder_scheduler import start_scheduler
 
 
 # =========================
@@ -80,6 +82,10 @@ app.config["MAIL_USE_SSL"] = os.getenv("MAIL_USE_SSL", "False").lower() in ("tru
 app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
 app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
 app.config["MAIL_DEFAULT_SENDER"] = os.getenv("MAIL_DEFAULT_SENDER")
+app.config["SCHEDULER_ENABLED"] = os.getenv(
+    "SCHEDULER_ENABLED",
+    "True"
+).lower() in ("true", "1", "t")
 
 
 # =========================
@@ -171,6 +177,11 @@ register_error_handlers(app)
 app.register_blueprint(jobs_bp)
 
 app.register_blueprint(auth_bp)
+
+app.register_blueprint(notifications_bp)
+
+if os.getenv("FLASK_RUN_FROM_CLI") == "true":
+    start_scheduler(app)
 
 
 # =========================
@@ -1543,6 +1554,8 @@ def test_email():
 # =========================
 
 if __name__ == "__main__":
+
+    start_scheduler(app)
 
     # Safe Mail Configuration Debug Output
     print("=" * 40)

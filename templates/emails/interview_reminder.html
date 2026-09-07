@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Interview reminder</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #202124; line-height: 1.5;">
+    <h1>Interview reminder</h1>
+    <p>Your interview is scheduled in approximately 24 hours.</p>
+    <table cellpadding="8" cellspacing="0" border="1" style="border-collapse: collapse;">
+        <tr>
+            <th align="left">Company</th>
+            <td>{{ application.company }}</td>
+        </tr>
+        <tr>
+            <th align="left">Role</th>
+            <td>{{ application.role }}</td>
+        </tr>
+        <tr>
+            <th align="left">Interview time</th>
+            <td>{{ application.interview_at }}</td>
+        </tr>
+    </table>
+    <p>Job Application Tracker</p>
+</body>
+</html>

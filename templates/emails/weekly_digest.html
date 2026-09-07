@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Weekly job application digest</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #202124; line-height: 1.5;">
+    <h1>Weekly job application digest</h1>
+    <p>Hello {{ user.name }},</p>
+    <p>Here are the applications updated from {{ week_start }} through {{ week_end }}.</p>
+
+    {% if applications %}
+    <table cellpadding="8" cellspacing="0" border="1" style="border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th align="left">Company</th>
+                <th align="left">Role</th>
+                <th align="left">Status</th>
+                <th align="left">Updated</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for application in applications %}
+            <tr>
+                <td>{{ application.company }}</td>
+                <td>{{ application.role }}</td>
+                <td>{{ application.status.value }}</td>
+                <td>{{ application.updated_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No applications were updated this week.</p>
+    {% endif %}
+
+    <p>Job Application Tracker</p>
+</body>
+</html>

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from extensions import db
 import enum
 
@@ -40,6 +40,23 @@ class JobApplication(db.Model):
         db.Date,
         nullable=False,
         default=date.today
+    )
+
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+    interview_at = db.Column(
+        db.DateTime,
+        nullable=True
+    )
+
+    interview_reminder_sent_at = db.Column(
+        db.DateTime,
+        nullable=True
     )
 
     notes = db.Column(
