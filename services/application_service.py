@@ -3,10 +3,14 @@ import os
 
 from extensions import db
 from models.job import JobApplication, ApplicationStatus
+from models.user import User
+
 from exceptions.application_exceptions import (
     ApplicationNotFound,
     DuplicateApplication
 )
+
+from services.email_service import send_email
 
 
 # =========================
@@ -175,6 +179,14 @@ class ApplicationService:
                 f"Application with ID {application_id} not found."
             )
 
+        # =========================
+        # Save Old Status
+        # =========================
+        old_status = application.status
+
+        # =========================
+        # Update Fields
+        # =========================
         application.company = data.get(
             "company",
             application.company
@@ -196,9 +208,36 @@ class ApplicationService:
         )
 
         if "applied_date" in data:
+
             application.applied_date = data["applied_date"]
 
+        # =========================
+        # Save Changes
+        # =========================
         db.session.commit()
+
+        # =========================
+        # Send Email When Status Changes
+        # =========================
+        if old_status != application.status:
+
+            user = db.session.get(User, user_id)
+
+            if user and user.email:
+
+                send_email(
+                    subject="Job Application Status Updated",
+                    recipients=[user.email],
+                    body=(
+                        f"Hello {user.name},\n\n"
+                        f"Your job application status has been updated.\n\n"
+                        f"Company: {application.company}\n"
+                        f"Role: {application.role}\n"
+                        f"Previous Status: {old_status.value}\n"
+                        f"New Status: {application.status.value}\n\n"
+                        f"Job Application Tracker"
+                    )
+                )
 
         logger.info(
             "Application updated successfully: %s",
@@ -210,7 +249,7 @@ class ApplicationService:
 
     # =========================
     # Delete Application
-    # Delete Resume File (Cascade)
+    # Delete Resume File
     # =========================
     @staticmethod
     def delete_application(application_id, user_id):
@@ -257,7 +296,7 @@ class ApplicationService:
                 )
 
         # =========================
-        # Delete Application from Database
+        # Delete Application
         # =========================
         db.session.delete(application)
 
@@ -284,27 +323,32 @@ class ApplicationService:
         total_applications = len(applications)
 
         applied = sum(
-            1 for application in applications
+            1
+            for application in applications
             if application.status == ApplicationStatus.APPLIED
         )
 
         phone_screen = sum(
-            1 for application in applications
+            1
+            for application in applications
             if application.status == ApplicationStatus.PHONE_SCREEN
         )
 
         interview = sum(
-            1 for application in applications
+            1
+            for application in applications
             if application.status == ApplicationStatus.INTERVIEW
         )
 
         rejected = sum(
-            1 for application in applications
+            1
+            for application in applications
             if application.status == ApplicationStatus.REJECTED
         )
 
         offered = sum(
-            1 for application in applications
+            1
+            for application in applications
             if application.status == ApplicationStatus.OFFER
         )
 
