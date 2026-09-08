@@ -508,6 +508,78 @@ def update_application(application_id):
 
 
 # ==========================================
+# Bulk Update Application Status
+# POST /applications/bulk-status
+# ==========================================
+
+@jobs_bp.route(
+    "/applications/bulk-status",
+    methods=["POST"]
+)
+@jobs_bp.route(
+    "/api/applications/bulk-status",
+    methods=["POST"]
+)
+@jwt_required()
+def bulk_update_application_status():
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict) or not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
+
+    application_ids = data.get("application_ids")
+    status_value = data.get("status")
+
+    if not isinstance(application_ids, list) or not application_ids:
+        return jsonify({
+            "error": "application_ids must be a non-empty list"
+        }), 400
+
+    if any(
+        not isinstance(application_id, int) or isinstance(application_id, bool)
+        or application_id < 1
+        for application_id in application_ids
+    ):
+        return jsonify({
+            "error": "application_ids must contain positive integers"
+        }), 400
+
+    if not isinstance(status_value, str):
+        return jsonify({
+            "error": "status is required"
+        }), 400
+
+    try:
+        status = ApplicationStatus[status_value.strip().upper()]
+    except KeyError:
+        return jsonify({
+            "error": "Invalid status"
+        }), 400
+
+    try:
+        user_id = int(get_jwt_identity())
+        result = ApplicationService.bulk_update_status(
+            application_ids,
+            status,
+            user_id
+        )
+
+        return jsonify({
+            "message": "Bulk status update completed",
+            **result
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+
+# ==========================================
 # Delete Application
 # DELETE /applications/<id>
 # ==========================================

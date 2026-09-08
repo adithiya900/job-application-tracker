@@ -172,3 +172,110 @@ def test_bulk_status_update_csv_validates_ids_and_statuses(
     assert data["failed"] == 2
     db.session.refresh(application)
     assert application.status == ApplicationStatus.OFFER
+
+
+def test_bulk_status_update_endpoint_updates_owned_applications(
+    client, auth_headers, test_user
+):
+    applications = [
+        JobApplication(
+            company=f"Bulk Company {index}",
+            role="Engineer",
+            status=ApplicationStatus.APPLIED,
+            user_id=test_user.id,
+        )
+        for index in (1, 2)
+    ]
+    db.session.add_all(applications)
+    db.session.commit()
+
+    response = client.post(
+        "/applications/bulk-status",
+        json={
+            "application_ids": [
+                application.id for application in applications
+            ] + [99999],
+            "status": "INTERVIEW",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["updated"] == 2
+    assert response.get_json()["failed"] == 1
+    assert all(
+        application.status == ApplicationStatus.INTERVIEW
+        for application in applications
+    )
+
+
+def test_bulk_status_update_endpoint_rejects_invalid_status(
+    client, auth_headers
+):
+    response = client.post(
+        "/applications/bulk-status",
+        json={
+            "application_ids": [1],
+            "status": "NOT_A_STATUS",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "Invalid status"
+
+
+def test_bulk_status_update_endpoint_validates_ids(
+    client, auth_headers
+):
+    for payload in (
+        {},
+        {"application_ids": [], "status": "OFFER"},
+        {"application_ids": [0, "2"], "status": "OFFER"},
+    ):
+        response = client.post(
+            "/applications/bulk-status",
+            json=payload,
+            headers=auth_headers,
+        )
+        assert response.status_code == 400
+
+
+def test_bulk_status_update_endpoint_is_user_scoped(
+    client, auth_headers, test_user
+):
+    other_application = JobApplication(
+        company="Other User Company",
+        role="Engineer",
+        status=ApplicationStatus.APPLIED,
+        user_id=test_user.id + 1,
+    )
+    db.session.add(other_application)
+    db.session.commit()
+
+    response = client.post(
+        "/applications/bulk-status",
+        json={
+            "application_ids": [other_application.id],
+            "status": "REJECTED",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["updated"] == 0
+    assert response.get_json()["failed"] == 1
+    db.session.refresh(other_application)
+    assert other_application.status == ApplicationStatus.APPLIED
+
+
+def test_bulk_status_update_endpoint_requires_authentication(client):
+    response = client.post(
+        "/applications/bulk-status",
+        json={
+            "application_ids": [1],
+            "status": "OFFER",
+        },
+    )
+
+    assert response.status_code == 401

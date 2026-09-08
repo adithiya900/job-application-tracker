@@ -254,6 +254,51 @@ class ApplicationService:
 
 
     # =========================
+    # Bulk Status Update
+    # =========================
+    @staticmethod
+    def bulk_update_status(application_ids, status, user_id):
+
+        applications = JobApplication.query.filter(
+            JobApplication.id.in_(application_ids),
+            JobApplication.user_id == user_id
+        ).all()
+
+        applications_by_id = {
+            application.id: application
+            for application in applications
+        }
+
+        updated_ids = []
+        failed = []
+
+        for application_id in application_ids:
+            application = applications_by_id.get(application_id)
+
+            if not application:
+                failed.append({
+                    "id": application_id,
+                    "error": (
+                        f"Application with ID {application_id} "
+                        "not found for current user"
+                    )
+                })
+                continue
+
+            application.status = status
+            updated_ids.append(application_id)
+
+        db.session.commit()
+
+        return {
+            "updated": len(updated_ids),
+            "updated_ids": updated_ids,
+            "failed": len(failed),
+            "errors": failed
+        }
+
+
+    # =========================
     # Delete Application
     # Delete Resume File
     # =========================
