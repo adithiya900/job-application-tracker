@@ -1,13 +1,14 @@
 from flask import Blueprint, request, jsonify, send_file
 from flask import Response
 from services.export_service import ExportService
+from services.import_service import ImportService
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from marshmallow import ValidationError
 from PyPDF2 import PdfReader
 import os
 
-from extensions import db
+from extensions import db, cache
 from services.application_service import ApplicationService
 from exceptions.application_exceptions import (
     ApplicationNotFound,
@@ -926,3 +927,96 @@ def search_jobs():
         return jsonify({
             "error": f"Unexpected error during job search: {str(e)}"
         }), 500
+
+# ==========================================
+# Import Applications from CSV
+# POST /applications/import
+# ==========================================
+
+@jobs_bp.route(
+    "/applications/import",
+    methods=["POST"]
+)
+@jobs_bp.route(
+    "/api/applications/import",
+    methods=["POST"]
+)
+@jwt_required()
+def import_applications():
+
+    try:
+
+        user_id = int(
+            get_jwt_identity()
+        )
+
+        if "file" not in request.files:
+            return jsonify({
+                "error": "CSV file is required"
+            }), 400
+
+        file = request.files["file"]
+
+        if not file.filename:
+            return jsonify({
+                "error": "CSV file is required"
+            }), 400
+
+        if not file.filename.lower().endswith(".csv"):
+            return jsonify({
+                "error": "Only CSV files are allowed"
+            }), 400
+
+        result = ImportService.import_applications(
+            file,
+            user_id
+        )
+
+        cache.set(
+            f"csv-import-errors:{user_id}",
+            result["errors"],
+            timeout=3600
+        )
+
+        return jsonify({
+            "message": "CSV import completed",
+            "imported": result["imported"],
+            "failed": result["failed"],
+            "errors": result["errors"]
+        }), 200
+
+    except ValueError as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 400
+
+    except Exception as e:
+
+        db.session.rollback()
+
+        return jsonify({
+            "error": "CSV import failed",
+            "message": str(e)
+        }), 500
+
+
+@jobs_bp.route(
+    "/applications/import/errors",
+    methods=["GET"]
+)
+@jobs_bp.route(
+    "/api/applications/import/errors",
+    methods=["GET"]
+)
+@jwt_required()
+def export_import_errors():
+
+    user_id = int(get_jwt_identity())
+    errors = cache.get(f"csv-import-errors:{user_id}") or []
+    csv_file = ExportService.export_error_log(errors)
+    response = Response(csv_file.getvalue(), mimetype="text/csv")
+    response.headers["Content-Disposition"] = (
+        "attachment; filename=application-import-errors.csv"
+    )
+    return response, 200

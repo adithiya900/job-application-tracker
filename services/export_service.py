@@ -6,6 +6,8 @@ from models.job import JobApplication
 
 class ExportService:
 
+    ERROR_HEADERS = ["row", "error", "id", "company", "role", "status", "applied_date", "interview_at", "notes"]
+
     @staticmethod
     def export_applications(user_id):
         applications = JobApplication.query.filter_by(
@@ -50,4 +52,27 @@ class ExportService:
 
         output.seek(0)
 
+        return output
+
+    @staticmethod
+    def export_error_log(errors):
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(ExportService.ERROR_HEADERS)
+
+        for failure in errors:
+            row = failure.get("data", {})
+            writer.writerow([
+                failure.get("row", ""),
+                failure.get("error", ""),
+                row.get("id", ""),
+                row.get("company", ""),
+                row.get("role", ""),
+                row.get("status", ""),
+                row.get("applied_date", ""),
+                row.get("interview_at", ""),
+                row.get("notes", "")
+            ])
+
+        output.seek(0)
         return output
