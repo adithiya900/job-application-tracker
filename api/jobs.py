@@ -820,7 +820,9 @@ def extract_resume_text(application_id):
                 f"Failed to extract resume text: {str(e)}"
 
         }), 500
-        # ==========================================
+
+
+# ==========================================
 # Export Applications as CSV
 # GET /applications/export
 # ==========================================
@@ -838,23 +840,12 @@ def export_applications():
 
     try:
 
-        user_id = int(
-            get_jwt_identity()
-        )
-
-        csv_file = ExportService.export_applications(
-            user_id
-        )
-
-        response = Response(
-            csv_file.getvalue(),
-            mimetype="text/csv"
-        )
-
+        user_id = int(get_jwt_identity())
+        csv_file = ExportService.export_applications(user_id)
+        response = Response(csv_file.getvalue(), mimetype="text/csv")
         response.headers["Content-Disposition"] = (
             "attachment; filename=applications.csv"
         )
-
         return response, 200
 
     except Exception as e:
@@ -928,6 +919,7 @@ def search_jobs():
             "error": f"Unexpected error during job search: {str(e)}"
         }), 500
 
+
 # ==========================================
 # Import Applications from CSV
 # POST /applications/import
@@ -946,9 +938,7 @@ def import_applications():
 
     try:
 
-        user_id = int(
-            get_jwt_identity()
-        )
+        user_id = int(get_jwt_identity())
 
         if "file" not in request.files:
             return jsonify({
@@ -967,11 +957,7 @@ def import_applications():
                 "error": "Only CSV files are allowed"
             }), 400
 
-        result = ImportService.import_applications(
-            file,
-            user_id
-        )
-
+        result = ImportService.import_applications(file, user_id)
         cache.set(
             f"csv-import-errors:{user_id}",
             result["errors"],

@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import create_engine
 
 from app import app
 from extensions import db
@@ -9,8 +10,12 @@ from tests.factories import UserFactory, ApplicationFactory
 def test_app():
 
     app.config["TESTING"] = True
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    original_uri = app.config["SQLALCHEMY_DATABASE_URI"]
+    original_engines = db._app_engines[app]
+    test_engine = create_engine("sqlite:///:memory:")
+    db._app_engines[app] = {None: test_engine}
 
     # Use in-memory cache in tests — does not require Redis
     app.config["CACHE_TYPE"] = "SimpleCache"
@@ -33,6 +38,9 @@ def test_app():
 
         db.session.remove()
         db.drop_all()
+        test_engine.dispose()
+        db._app_engines[app] = original_engines
+        app.config["SQLALCHEMY_DATABASE_URI"] = original_uri
 
 
 
