@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify, send_file
+from flask import Response
+from services.export_service import ExportService
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from marshmallow import ValidationError
@@ -816,6 +818,49 @@ def extract_resume_text(application_id):
             "error":
                 f"Failed to extract resume text: {str(e)}"
 
+        }), 500
+        # ==========================================
+# Export Applications as CSV
+# GET /applications/export
+# ==========================================
+
+@jobs_bp.route(
+    "/applications/export",
+    methods=["GET"]
+)
+@jobs_bp.route(
+    "/api/applications/export",
+    methods=["GET"]
+)
+@jwt_required()
+def export_applications():
+
+    try:
+
+        user_id = int(
+            get_jwt_identity()
+        )
+
+        csv_file = ExportService.export_applications(
+            user_id
+        )
+
+        response = Response(
+            csv_file.getvalue(),
+            mimetype="text/csv"
+        )
+
+        response.headers["Content-Disposition"] = (
+            "attachment; filename=applications.csv"
+        )
+
+        return response, 200
+
+    except Exception as e:
+
+        return jsonify({
+            "error": "Failed to export applications",
+            "details": str(e)
         }), 500
 
 
