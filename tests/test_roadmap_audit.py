@@ -8,6 +8,7 @@ from models.job import ApplicationStatus, JobApplication
 from seed import seed_database
 from services.digest_service import send_weekly_digest
 from services.reminder_service import send_interview_reminders
+from scheduler.reminder_scheduler import start_scheduler
 
 
 def test_validation_and_http_errors_use_documented_error_shape(client, auth_headers):
@@ -28,6 +29,17 @@ def test_validation_and_http_errors_use_documented_error_shape(client, auth_head
 
     assert "company" in missing_company.get_json()["details"]
     assert "applied_date" in future_date.get_json()["details"]
+
+
+def test_unexpected_error_uses_documented_error_shape(client, auth_headers):
+    with patch("api.jobs.ApplicationService.create_application", side_effect=RuntimeError("audit failure")):
+        response = client.post(
+            "/api/applications",
+            json={"company": "Acme", "role": "Engineer"},
+            headers=auth_headers,
+        )
+    assert response.status_code == 500
+    assert response.get_json()["status_code"] == 500
 
 
 def test_resume_upload_file_url_and_delete_cascade(client, auth_headers, test_user):
@@ -109,3 +121,18 @@ def test_digest_and_interview_reminder_render_and_send(test_app, test_user):
         assert send_interview_reminders(now=now) == 1
     assert reminder_sender.call_args.kwargs["template_name"] == "emails/interview_reminder.html"
     assert application.interview_reminder_sent_at == now
+
+
+def test_scheduler_registers_digest_and_reminder_jobs(test_app):
+    original_testing = test_app.testing
+    original_enabled = test_app.config["SCHEDULER_ENABLED"]
+    test_app.testing = False
+    test_app.config["SCHEDULER_ENABLED"] = True
+    scheduler = start_scheduler(test_app)
+    try:
+        assert {job.id for job in scheduler.get_jobs()} == {"interview-reminders", "weekly-digest"}
+    finally:
+        scheduler.shutdown(wait=False)
+        test_app.extensions.pop("interview_scheduler", None)
+        test_app.testing = original_testing
+        test_app.config["SCHEDULER_ENABLED"] = original_enabled
