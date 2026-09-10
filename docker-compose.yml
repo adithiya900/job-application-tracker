@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: job_tracker
       POSTGRES_USER: job_tracker
-      POSTGRES_PASSWORD: job_tracker_dev_only
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment or .env file}
     ports:
       - "5432:5432"
     volumes:

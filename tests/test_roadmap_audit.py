@@ -42,6 +42,41 @@ def test_unexpected_error_uses_documented_error_shape(client, auth_headers):
     assert response.get_json()["status_code"] == 500
 
 
+def test_jwt_register_login_refresh_logout_and_rejection(client):
+    """Exercise the complete Day 7 token lifecycle at the HTTP boundary."""
+    credentials = {
+        "name": "Lifecycle User",
+        "email": "lifecycle@example.com",
+        "password": "a-test-password",
+    }
+    registered = client.post("/register", json=credentials)
+    assert registered.status_code == 201
+
+    logged_in = client.post(
+        "/login",
+        json={"email": credentials["email"], "password": credentials["password"]},
+    )
+    assert logged_in.status_code == 200
+    tokens = logged_in.get_json()
+    access_headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+    protected = client.get("/api/applications", headers=access_headers)
+    assert protected.status_code == 200
+
+    refreshed = client.post(
+        "/refresh",
+        headers={"Authorization": f"Bearer {tokens['refresh_token']}"},
+    )
+    assert refreshed.status_code == 200
+    assert refreshed.get_json()["access_token"]
+
+    logged_out = client.post("/logout", headers=access_headers)
+    assert logged_out.status_code == 200
+    rejected = client.get("/api/applications", headers=access_headers)
+    assert rejected.status_code == 401
+    assert rejected.get_json()["status_code"] == 401
+
+
 def test_resume_upload_file_url_and_delete_cascade(client, auth_headers, test_user):
     application = JobApplication(
         company="File Company", role="Engineer", status=ApplicationStatus.APPLIED, user_id=test_user.id

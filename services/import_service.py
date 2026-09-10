@@ -211,7 +211,11 @@ class ImportService:
                     "data": row if "row" in locals() else {}
                 })
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
 
         return {
             "imported": imported,

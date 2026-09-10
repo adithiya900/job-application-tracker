@@ -63,7 +63,11 @@ class ApplicationService:
         )
 
         db.session.add(new_application)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
 
         logger.info(
             "Application created successfully with ID: %s",
@@ -178,7 +182,11 @@ class ApplicationService:
         application = ApplicationService.get_application_by_id(application_id, user_id)
         previous_path = application.resume_path
         application.resume_path = resume_path
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
         return previous_path
 
 
@@ -239,7 +247,11 @@ class ApplicationService:
         # =========================
         # Save Changes
         # =========================
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
 
         # =========================
         # Send Email When Status Changes
@@ -307,7 +319,11 @@ class ApplicationService:
             application.status = status
             updated_ids.append(application_id)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
 
         return {
             "updated": len(updated_ids),
@@ -370,7 +386,11 @@ class ApplicationService:
         # =========================
         db.session.delete(application)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
 
         logger.info(
             "Application and resume deleted successfully: %s",

@@ -8,7 +8,7 @@ from marshmallow import ValidationError
 from PyPDF2 import PdfReader
 import os
 
-from extensions import db, cache
+from extensions import cache
 from services.application_service import ApplicationService
 from exceptions.application_exceptions import (
     ApplicationNotFound,
@@ -601,7 +601,6 @@ def bulk_update_application_status():
         }), 200
 
     except Exception as e:
-        db.session.rollback()
         return jsonify({
             "error": str(e)
         }), 500
@@ -1101,8 +1100,6 @@ def import_applications():
         }), 400
 
     except Exception as e:
-
-        db.session.rollback()
 
         return jsonify({
             "error": "CSV import failed",

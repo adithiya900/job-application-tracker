@@ -1,4 +1,6 @@
 """Idempotently seed the three Day 1 demonstration applications."""
+import os
+import secrets
 from app import app
 from extensions import bcrypt, db
 from models.job import ApplicationStatus, JobApplication
@@ -12,7 +14,9 @@ def seed_database():
             user = User(
                 name="Demo User",
                 email="demo@example.com",
-                password=bcrypt.generate_password_hash("change-me").decode("utf-8"),
+                password=bcrypt.generate_password_hash(
+                    os.getenv("DEMO_USER_PASSWORD") or secrets.token_urlsafe(24)
+                ).decode("utf-8"),
             )
             db.session.add(user)
             db.session.flush()
