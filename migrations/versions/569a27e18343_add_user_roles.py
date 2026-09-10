@@ -17,7 +17,6 @@ depends_on = None
 
 
 def upgrade():
-    
     role_enum = sa.Enum(
         'USER',
         'ADMIN',
@@ -51,9 +50,7 @@ def upgrade():
         batch_op.alter_column(
             'role',
             server_default=None
-        )
- 
-   
+    )
 
 
 def downgrade():
@@ -72,4 +69,3 @@ def downgrade():
         op.get_bind(),
         checkfirst=True
     )
-   
