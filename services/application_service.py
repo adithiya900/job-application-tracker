@@ -172,6 +172,15 @@ class ApplicationService:
             raise ApplicationNotFound("Resume file not found.")
         return application
 
+    @staticmethod
+    def set_resume_path(application_id, user_id, resume_path):
+        """Persist a resume path through the service layer."""
+        application = ApplicationService.get_application_by_id(application_id, user_id)
+        previous_path = application.resume_path
+        application.resume_path = resume_path
+        db.session.commit()
+        return previous_path
+
 
     # =========================
     # Update Application

@@ -728,9 +728,11 @@ def upload_resume(application_id):
 
         file.save(file_path)
 
-        old_file_path = application.resume_path
-        application.resume_path = file_path
-        db.session.commit()
+        old_file_path = ApplicationService.set_resume_path(
+            application_id,
+            user_id,
+            file_path
+        )
         if old_file_path and old_file_path != file_path and os.path.exists(old_file_path):
             os.remove(old_file_path)
 
