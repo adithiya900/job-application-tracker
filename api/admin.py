@@ -6,6 +6,8 @@ from flask_jwt_extended import (
 )
 
 from models.user import User
+from models.audit_log import AuditLog
+from extensions import db
 from utils.admin import admin_required
 
 
@@ -73,6 +75,16 @@ def impersonate_user(user_id):
         additional_claims={"impersonated_by": current_admin_id}
     )
 
+    db.session.add(AuditLog(
+        admin_id=current_admin_id,
+        action="user_impersonated",
+        target_user_id=user.id,
+        details={
+            "target_email": user.email
+        }
+    ))
+    db.session.commit()
+
     return jsonify({
         "message": "User impersonation token created",
         "impersonated_user": {
@@ -82,4 +94,44 @@ def impersonate_user(user_id):
             "role": user.role.value
         },
         "access_token": impersonation_token
+    }), 200
+
+
+# ==========================================
+# Admin - Delete User
+# DELETE /api/admin/users/<user_id>
+# ==========================================
+
+@admin_bp.route("/api/admin/users/<int:user_id>", methods=["DELETE"])
+@admin_required
+def delete_user(user_id):
+
+    current_admin_id = int(get_jwt_identity())
+
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({
+            "error": "User not found"
+        }), 404
+
+    if user.id == current_admin_id:
+        return jsonify({
+            "error": "Admin cannot delete themselves"
+        }), 400
+
+    db.session.add(AuditLog(
+        admin_id=current_admin_id,
+        action="user_deleted",
+        target_user_id=user.id,
+        details={
+            "target_email": user.email,
+            "target_role": user.role.value
+        }
+    ))
+    db.session.delete(user)
+    db.session.commit()
+
+    return jsonify({
+        "message": "User deleted successfully"
     }), 200

@@ -43,7 +43,14 @@ class User(db.Model):
     applications = db.relationship(
         "JobApplication",
         backref="user",
-        lazy=True
+        lazy=True,
+        cascade="all, delete-orphan"
+    )
+
+    blocklisted_tokens = db.relationship(
+        "TokenBlocklist",
+        lazy=True,
+        cascade="all, delete-orphan"
     )
 
     def __repr__(self):
