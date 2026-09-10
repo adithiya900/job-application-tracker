@@ -1,3 +1,4 @@
+
 from models.job import JobApplication
 from models.user import User
 from models.token_blocklist import TokenBlocklist
@@ -23,6 +24,7 @@ from errors.handlers import register_error_handlers
 from api.jobs import jobs_bp
 from api.auth import auth_bp
 from api.notifications import notifications_bp
+from api.admin import admin_bp
 from scheduler.reminder_scheduler import start_scheduler
 
 
@@ -354,6 +356,7 @@ app.register_blueprint(jobs_bp)
 app.register_blueprint(auth_bp)
 
 app.register_blueprint(notifications_bp)
+app.register_blueprint(admin_bp)
 
 if os.getenv("FLASK_RUN_FROM_CLI") == "true":
     start_scheduler(app)

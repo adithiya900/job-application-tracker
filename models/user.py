@@ -1,4 +1,10 @@
 from extensions import db
+import enum
+
+
+class Role(enum.Enum):
+    USER = "USER"
+    ADMIN = "ADMIN"
 
 
 class User(db.Model):
@@ -24,6 +30,13 @@ class User(db.Model):
     password = db.Column(
         db.String(255),
         nullable=False
+    )
+
+    # User role
+    role = db.Column(
+        db.Enum(Role),
+        nullable=False,
+        default=Role.USER
     )
 
     # One user can have many job applications

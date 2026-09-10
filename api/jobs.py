@@ -1,3 +1,4 @@
+from utils.admin import admin_required
 from flask import Blueprint, request, jsonify, send_file
 from flask import Response
 from services.export_service import ExportService
@@ -1126,3 +1127,14 @@ def export_import_errors():
         "attachment; filename=application-import-errors.csv"
     )
     return response, 200
+
+    # ==========================================
+# Temporary Admin Test Route
+# ==========================================
+
+@jobs_bp.route("/admin/test", methods=["GET"])
+@admin_required
+def admin_test():
+    return jsonify({
+        "message": "Admin access granted"
+    }), 200
