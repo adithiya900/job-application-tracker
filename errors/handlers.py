@@ -1,6 +1,15 @@
 from flask import jsonify
 
 
+def error_response(error, status_code, details=None):
+    """Return the documented error payload used by every API failure."""
+    return jsonify({
+        "error": error,
+        "details": details if details is not None else error,
+        "status_code": status_code,
+    }), status_code
+
+
 def register_error_handlers(app):
 
     # =========================
@@ -9,10 +18,7 @@ def register_error_handlers(app):
     @app.errorhandler(400)
     def bad_request(error):
 
-        return jsonify({
-            "error": "Bad Request",
-            "message": str(error.description)
-        }), 400
+        return error_response("Bad Request", 400, str(error.description))
 
 
     # =========================
@@ -21,10 +27,7 @@ def register_error_handlers(app):
     @app.errorhandler(401)
     def unauthorized(error):
 
-        return jsonify({
-            "error": "Unauthorized",
-            "message": "Authentication is required"
-        }), 401
+        return error_response("Unauthorized", 401, "Authentication is required")
 
 
     # =========================
@@ -33,10 +36,7 @@ def register_error_handlers(app):
     @app.errorhandler(403)
     def forbidden(error):
 
-        return jsonify({
-            "error": "Forbidden",
-            "message": "You do not have permission to access this resource"
-        }), 403
+        return error_response("Forbidden", 403, "You do not have permission to access this resource")
 
 
     # =========================
@@ -45,10 +45,7 @@ def register_error_handlers(app):
     @app.errorhandler(404)
     def not_found(error):
 
-        return jsonify({
-            "error": "Not Found",
-            "message": "The requested resource was not found"
-        }), 404
+        return error_response("Not Found", 404, "The requested resource was not found")
 
 
     # =========================
@@ -57,10 +54,7 @@ def register_error_handlers(app):
     @app.errorhandler(405)
     def method_not_allowed(error):
 
-        return jsonify({
-            "error": "Method Not Allowed",
-            "message": "This HTTP method is not allowed for this endpoint"
-        }), 405
+        return error_response("Method Not Allowed", 405, "This HTTP method is not allowed for this endpoint")
 
 
     # =========================
@@ -69,7 +63,4 @@ def register_error_handlers(app):
     @app.errorhandler(500)
     def internal_server_error(error):
 
-        return jsonify({
-            "error": "Internal Server Error",
-            "message": "Something went wrong on the server"
-        }), 500
+        return error_response("Internal Server Error", 500, "Something went wrong on the server")

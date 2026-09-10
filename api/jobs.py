@@ -32,6 +32,12 @@ from services.job_search_service import (
 
 jobs_bp = Blueprint("jobs", __name__)
 
+RESUME_SKILLS = (
+    "Python", "Java", "JavaScript", "TypeScript", "SQL", "Flask", "Django",
+    "FastAPI", "React", "Node.js", "PostgreSQL", "Docker", "AWS", "Git",
+    "Redis", "Kubernetes", "Linux", "HTML", "CSS",
+)
+
 
 # ==========================================
 # Schemas
@@ -135,17 +141,12 @@ def create_application():
         # Return the first Marshmallow validation
         # message in the existing API error format
 
-        error_messages = []
-
-        for field_errors in e.messages.values():
-            error_messages.extend(field_errors)
+        error_messages = [message for errors in e.messages.values() for message in errors]
 
         return jsonify({
 
-            "error":
-                error_messages[0]
-                if error_messages
-                else "Validation Error"
+            "error": error_messages[0] if error_messages else "Validation Error",
+            "details": e.messages
 
         }), 400
 
@@ -512,17 +513,12 @@ def update_application(application_id):
         # Return the first Marshmallow validation
         # message in the existing API error format
 
-        error_messages = []
-
-        for field_errors in e.messages.values():
-            error_messages.extend(field_errors)
+        error_messages = [message for errors in e.messages.values() for message in errors]
 
         return jsonify({
 
-            "error":
-                error_messages[0]
-                if error_messages
-                else "Validation Error"
+            "error": error_messages[0] if error_messages else "Validation Error",
+            "details": e.messages
 
         }), 400
 
@@ -710,7 +706,7 @@ def upload_resume(application_id):
             )
         )
 
-        upload_folder = "uploads"
+        upload_folder = os.path.join(os.getcwd(), "uploads")
 
         os.makedirs(
             upload_folder,
@@ -732,9 +728,11 @@ def upload_resume(application_id):
 
         file.save(file_path)
 
+        old_file_path = application.resume_path
         application.resume_path = file_path
-
         db.session.commit()
+        if old_file_path and old_file_path != file_path and os.path.exists(old_file_path):
+            os.remove(old_file_path)
 
         return jsonify({
 
@@ -757,6 +755,20 @@ def upload_resume(application_id):
         return jsonify({
             "error": str(e)
         }), 500
+
+
+@jobs_bp.route("/files/<path:filename>", methods=["GET"])
+@jwt_required()
+def serve_resume_file(filename):
+    """Serve an uploaded resume only to the user who owns its application."""
+    user_id = int(get_jwt_identity())
+    try:
+        application = ApplicationService.get_application_by_resume_filename(filename, user_id)
+    except ApplicationNotFound as exc:
+        return jsonify({"error": str(exc)}), 404
+    if not application.resume_path or not os.path.isfile(application.resume_path):
+        return jsonify({"error": "Resume file not found"}), 404
+    return send_file(application.resume_path, as_attachment=True)
 
 
 # ==========================================
@@ -881,6 +893,7 @@ def extract_resume_text(application_id):
                 resume_text += text + "\n"
 
         resume_text = resume_text.strip()
+        skills = [skill for skill in RESUME_SKILLS if skill.lower() in resume_text.lower()]
 
         if not resume_text:
 
@@ -893,7 +906,9 @@ def extract_resume_text(application_id):
                     application_id,
 
                 "resume_text":
-                    ""
+                    "",
+
+                "skills": []
 
             }), 200
 
@@ -906,7 +921,9 @@ def extract_resume_text(application_id):
                 application_id,
 
             "resume_text":
-                resume_text
+                resume_text,
+
+            "skills": skills
 
         }), 200
 

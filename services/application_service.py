@@ -162,6 +162,16 @@ class ApplicationService:
 
         return application
 
+    @staticmethod
+    def get_application_by_resume_filename(filename, user_id):
+        """Find a user-owned application by its stored resume filename."""
+        application = JobApplication.query.filter_by(user_id=user_id).filter(
+            JobApplication.resume_path.like(f"%{filename}")
+        ).first()
+        if not application:
+            raise ApplicationNotFound("Resume file not found.")
+        return application
+
 
     # =========================
     # Update Application

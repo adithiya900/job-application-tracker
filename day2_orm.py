@@ -1,5 +1,5 @@
 from app import app
-from extensions import db
+from extensions import bcrypt, db
 from models.user import User
 from models.job import JobApplication, ApplicationStatus
 
@@ -15,7 +15,8 @@ with app.app_context():
     if not user:
         user = User(
             name="Adithiya",
-            email="adithiya@example.com"
+            email="adithiya@example.com",
+            password=bcrypt.generate_password_hash("change-me").decode("utf-8")
         )
 
         db.session.add(user)

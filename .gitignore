@@ -1,8 +1,10 @@
 venv/
+.venv-audit/
 __pycache__/
 *.pyc
 .env
 .coverage
+coverage.json
 htmlcov/
 uploads/
 .pytest_cache/
