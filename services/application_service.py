@@ -418,3 +418,119 @@ class ApplicationService:
                 "REJECTED": rejected
             }
         }
+
+            # =========================
+    # Analytics
+    # =========================
+    @staticmethod
+    def get_analytics(user_id):
+
+        applications = JobApplication.query.filter_by(
+            user_id=user_id
+        ).all()
+
+        total_applications = len(applications)
+
+        # -------------------------
+        # Response Rate
+        # -------------------------
+        interviews = sum(
+            1
+            for application in applications
+            if application.status == ApplicationStatus.INTERVIEW
+        )
+
+        response_rate = (
+            round((interviews / total_applications) * 100, 2)
+            if total_applications
+            else 0
+        )
+
+        # -------------------------
+        # Time-in-Stage
+        # -------------------------
+        stage_days = {
+            status.value: []
+            for status in ApplicationStatus
+        }
+
+        for application in applications:
+
+            if application.updated_at and application.applied_date:
+
+                days = (
+                    application.updated_at.date()
+                    - application.applied_date
+                ).days
+
+                stage_days[application.status.value].append(days)
+
+        time_in_stage = {
+            status: round(sum(days) / len(days), 2)
+            if days
+            else 0
+            for status, days in stage_days.items()
+        }
+
+        # -------------------------
+        # Best Day of Week
+        # -------------------------
+        weekday_stats = {}
+
+        for application in applications:
+
+            day = application.applied_date.strftime("%A")
+
+            if day not in weekday_stats:
+                weekday_stats[day] = {
+                    "applications": 0,
+                    "successful": 0
+                }
+
+            weekday_stats[day]["applications"] += 1
+
+            if application.status in (
+                ApplicationStatus.INTERVIEW,
+                ApplicationStatus.OFFER
+            ):
+                weekday_stats[day]["successful"] += 1
+
+        best_day = None
+        best_rate = -1
+
+        for day, stats in weekday_stats.items():
+
+            rate = (
+                stats["successful"] / stats["applications"]
+            ) * 100
+
+            if rate > best_rate:
+                best_rate = rate
+                best_day = day
+
+        best_day_of_week = {
+            "day": best_day,
+            "success_rate": round(best_rate, 2)
+            if best_rate >= 0
+            else 0
+        }
+
+        # -------------------------
+        # Status Counts
+        # -------------------------
+        by_status = {
+            status.value: sum(
+                1
+                for application in applications
+                if application.status == status
+            )
+            for status in ApplicationStatus
+        }
+
+        return {
+            "total_applications": total_applications,
+            "response_rate": response_rate,
+            "time_in_stage": time_in_stage,
+            "best_day_of_week": best_day_of_week,
+            "by_status": by_status
+        }

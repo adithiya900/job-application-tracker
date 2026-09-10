@@ -354,6 +354,38 @@ def get_dashboard_statistics():
             "error": str(e)
         }), 500
 
+        # ==========================================
+# Analytics
+# GET /api/analytics
+# ==========================================
+
+@jobs_bp.route(
+    "/api/analytics",
+    methods=["GET"]
+)
+@jwt_required()
+def get_analytics():
+
+    try:
+
+        user_id = int(
+            get_jwt_identity()
+        )
+
+        analytics = ApplicationService.get_analytics(
+            user_id
+        )
+
+        return jsonify(
+            analytics
+        ), 200
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 500
+
 
 # ==========================================
 # Get Application By ID
