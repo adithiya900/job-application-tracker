@@ -1,3 +1,4 @@
+from services.webhook_service import WebhookService
 import logging
 import os
 
@@ -257,6 +258,8 @@ class ApplicationService:
         # Send Email When Status Changes
         # =========================
         if old_status != application.status:
+            if application.status == ApplicationStatus.OFFER:
+                WebhookService.send_slack_offer_notification(application)
 
             user = db.session.get(User, user_id)
 
@@ -276,6 +279,13 @@ class ApplicationService:
                     )
                 )
 
+            # Send Webhook When Status Changes
+            WebhookService.send_status_change(
+                application=application,
+                old_status=old_status,
+                new_status=application.status
+            )
+
         logger.info(
             "Application updated successfully: %s",
             application_id
@@ -283,7 +293,9 @@ class ApplicationService:
 
         return application
 
+     
 
+   
     # =========================
     # Bulk Status Update
     # =========================

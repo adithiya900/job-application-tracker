@@ -219,7 +219,7 @@ def validate_smtp_settings(config=None):
         "MAIL_PORT",
         "MAIL_USERNAME",
         "MAIL_PASSWORD",
-        "MAIL_DEFAULT_SENDER",
+        "MAIL_DEFAULT_ SENDER",
     ]
     missing = [key for key in required if not settings.get(key)]
     if missing:
