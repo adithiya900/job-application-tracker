@@ -36,6 +36,35 @@ def test_create_application_api(client, auth_headers):
     assert response_data["application"]["role"] == "Software Engineer"
     assert response_data["application"]["status"] == "APPLIED"
 
+# ==========================================
+# Create Application - XSS Sanitisation
+# ==========================================
+def test_create_application_xss_sanitisation(
+    client,
+    auth_headers
+):
+
+    data = {
+        "company": "XSS Test",
+        "role": "Security Test",
+        "status": "APPLIED",
+        "notes": "<script>alert('XSS')</script>"
+    }
+
+    response = client.post(
+        "/applications",
+        json=data,
+        headers=auth_headers
+    )
+
+    assert response.status_code == 201
+
+    response_data = response.get_json()
+
+    assert response_data["application"]["notes"] == (
+        "&lt;script&gt;alert(&#x27;XSS&#x27;)&lt;/script&gt;"
+    )    
+
 
 # ==========================================
 # Create Application - Missing Company

@@ -1,3 +1,4 @@
+from html import escape
 from services.webhook_service import WebhookService
 import logging
 import os
@@ -12,6 +13,10 @@ from exceptions.application_exceptions import (
 )
 
 from services.email_service import send_email
+def sanitize_notes(notes):
+    if notes is None:
+        return None
+    return escape(str(notes))
 
 
 # =========================
@@ -59,7 +64,7 @@ class ApplicationService:
                 ApplicationStatus.APPLIED
             ),
             interview_at=data.get("interview_at"),
-            notes=data.get("notes"),
+            notes=sanitize_notes(data.get("notes")),
             user_id=user_id
         )
 
@@ -233,12 +238,11 @@ class ApplicationService:
 
         if "interview_at" in data:
 
-            application.interview_at = data["interview_at"]
-            application.interview_reminder_sent_at = None
+           application.interview_at = data["interview_at"]
+           application.interview_reminder_sent_at = None
 
-        application.notes = data.get(
-            "notes",
-            application.notes
+        application.notes = sanitize_notes(
+           data.get("notes", application.notes)
         )
 
         if "applied_date" in data:

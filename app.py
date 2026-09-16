@@ -3,6 +3,9 @@ from models.job import JobApplication
 from models.user import User
 from models.token_blocklist import TokenBlocklist
 from flask import Flask, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_cors import CORS
 import json
 from dotenv import load_dotenv
 import os
@@ -130,10 +133,20 @@ def safe_smtp_diagnostic():
 # Create Flask App
 # =========================
 app = Flask(__name__)
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=["100 per minute"]
+)
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
 
 @app.after_request
 def normalize_error_payload(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
     """Ensure route, JWT, and HTTP errors share the documented shape."""
     if response.status_code < 400 or not response.is_json:
         return response
