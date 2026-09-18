@@ -32,6 +32,8 @@ from services.job_search_service import (
 # ==========================================
 
 jobs_bp = Blueprint("jobs", __name__)
+v1_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
+v2_bp = Blueprint("api_v2", __name__, url_prefix="/api/v2")
 
 RESUME_SKILLS = (
     "Python", "Java", "JavaScript", "TypeScript", "SQL", "Flask", "Django",
@@ -1138,3 +1140,35 @@ def admin_test():
     return jsonify({
         "message": "Admin access granted"
     }), 200
+
+@v1_bp.route("/applications", methods=["GET"])
+@jwt_required()
+def get_all_applications_v1():
+    response = get_all_applications()
+    response[0].headers["Deprecation"] = "true"
+    return response
+
+@v2_bp.route("/applications", methods=["GET"])
+@jwt_required()
+def get_all_applications_v2():
+    response = get_all_applications()
+
+    if request.args.get("format") == "summary":
+        data = response[0].get_json()
+
+        summary = [
+            {
+                "id": application["id"],
+                "company": application["company"],
+                "role": application["role"],
+                "status": application["status"]
+            }
+            for application in data.get("applications", [])
+        ]
+
+        return jsonify({
+            "applications": summary,
+            "pagination": data.get("pagination")
+        })
+
+    return response    

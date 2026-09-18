@@ -2,7 +2,7 @@
 from models.job import JobApplication
 from models.user import User
 from models.token_blocklist import TokenBlocklist
-from flask import Flask, jsonify
+from flask import Flask, jsonify,request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
@@ -24,7 +24,7 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from errors.handlers import register_error_handlers
 
 # Import Blueprints
-from api.jobs import jobs_bp
+from api.jobs import jobs_bp, v1_bp, v2_bp
 from api.auth import auth_bp
 from api.notifications import notifications_bp
 from api.admin import admin_bp
@@ -147,6 +147,8 @@ def normalize_error_payload(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    if request.path.startswith("/api/v1/"):
+        response.headers["Deprecation"] = "true"
     """Ensure route, JWT, and HTTP errors share the documented shape."""
     if response.status_code < 400 or not response.is_json:
         return response
@@ -370,6 +372,8 @@ app.register_blueprint(auth_bp)
 
 app.register_blueprint(notifications_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(v1_bp)
+app.register_blueprint(v2_bp)
 
 if os.getenv("FLASK_RUN_FROM_CLI") == "true":
     start_scheduler(app)
