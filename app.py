@@ -375,6 +375,32 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(v1_bp)
 app.register_blueprint(v2_bp)
 
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    health = {
+        "status": "healthy",
+        "database": "healthy",
+        "redis": "healthy"
+    }
+    
+    try:
+        from sqlalchemy import text
+        db.session.execute(text("SELECT 1"))
+    except Exception as e:
+        health["database"] = "unhealthy"
+        health["status"] = "unhealthy"
+        
+    try:
+        cache.set("health_ping", "pong", timeout=5)
+        if cache.get("health_ping") != "pong":
+            raise Exception("Cache value mismatch")
+    except Exception as e:
+        health["redis"] = "unhealthy"
+        health["status"] = "unhealthy"
+        
+    status_code = 200 if health["status"] == "healthy" else 503
+    return jsonify(health), status_code
+
 if os.getenv("FLASK_RUN_FROM_CLI") == "true":
     start_scheduler(app)
 
