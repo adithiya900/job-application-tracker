@@ -213,6 +213,8 @@ class ImportService:
 
         try:
             db.session.commit()
+            from extensions import cache
+            cache.delete(f"analytics:user:{user_id}")
         except Exception:
             db.session.rollback()
             raise

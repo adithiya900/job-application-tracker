@@ -358,7 +358,7 @@ def get_dashboard_statistics():
             "error": str(e)
         }), 500
 
-        # ==========================================
+# ==========================================
 # Analytics
 # GET /api/analytics
 # ==========================================
@@ -376,9 +376,14 @@ def get_analytics():
             get_jwt_identity()
         )
 
-        analytics = ApplicationService.get_analytics(
-            user_id
-        )
+        cache_key = f"analytics:user:{user_id}"
+        analytics = cache.get(cache_key)
+
+        if not analytics:
+            analytics = ApplicationService.get_analytics(
+                user_id
+            )
+            cache.set(cache_key, analytics, timeout=300)
 
         return jsonify(
             analytics

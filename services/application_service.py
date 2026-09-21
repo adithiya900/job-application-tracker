@@ -3,7 +3,7 @@ from services.webhook_service import WebhookService
 import logging
 import os
 
-from extensions import db
+from extensions import db, cache
 from models.job import JobApplication, ApplicationStatus
 from models.user import User
 
@@ -26,12 +26,12 @@ logger = logging.getLogger(__name__)
 
 
 class ApplicationService:
-
     # =========================
     # Create Application
     # =========================
     @staticmethod
     def create_application(data, user_id):
+
 
         logger.info(
             "Creating application for company: %s",
@@ -79,6 +79,8 @@ class ApplicationService:
             "Application created successfully with ID: %s",
             new_application.id
         )
+
+        cache.delete(f"analytics:user:{user_id}")
 
         return new_application
 
@@ -295,6 +297,8 @@ class ApplicationService:
             application_id
         )
 
+        cache.delete(f"analytics:user:{user_id}")
+
         return application
 
      
@@ -337,6 +341,7 @@ class ApplicationService:
 
         try:
             db.session.commit()
+            cache.delete(f"analytics:user:{user_id}")
         except Exception:
             db.session.rollback()
             raise
@@ -413,6 +418,8 @@ class ApplicationService:
             application_id
         )
 
+        cache.delete(f"analytics:user:{user_id}")
+
         return True
 
 
@@ -473,113 +480,119 @@ class ApplicationService:
                 "REJECTED": rejected
             }
         }
-
-            # =========================
+    # =========================
     # Analytics
     # =========================
     @staticmethod
     def get_analytics(user_id):
-
-        applications = JobApplication.query.filter_by(
-            user_id=user_id
+        # -------------------------
+        # Status Counts (Replaces .all() and separate count queries)
+        # -------------------------
+        status_counts = db.session.query(
+            JobApplication.status,
+            db.func.count(JobApplication.id)
+        ).filter(
+            JobApplication.user_id == user_id
+        ).group_by(
+            JobApplication.status
         ).all()
 
-        total_applications = len(applications)
+        by_status = {status.value: 0 for status in ApplicationStatus}
+        total_applications = 0
+        interviews = 0
+
+        for status, count in status_counts:
+            by_status[status.value] = count
+            total_applications += count
+            if status == ApplicationStatus.INTERVIEW:
+                interviews = count
 
         # -------------------------
         # Response Rate
         # -------------------------
-        interviews = sum(
-            1
-            for application in applications
-            if application.status == ApplicationStatus.INTERVIEW
-        )
-
         response_rate = (
             round((interviews / total_applications) * 100, 2)
-            if total_applications
+            if total_applications > 0
             else 0
         )
 
         # -------------------------
         # Time-in-Stage
         # -------------------------
-        stage_days = {
-            status.value: []
+        time_in_stage = {
+            status.value: 0
             for status in ApplicationStatus
         }
 
-        for application in applications:
+        stage_results = db.session.query(
+            JobApplication.status,
+            db.func.avg(
+                db.func.extract(
+                    "epoch",
+                    JobApplication.updated_at
+                    - db.func.cast(
+                        JobApplication.applied_date,
+                        db.DateTime
+                    )
+                ) / 86400
+            )
+        ).filter(
+            JobApplication.user_id == user_id
+        ).group_by(
+            JobApplication.status
+        ).all()
 
-            if application.updated_at and application.applied_date:
-
-                days = (
-                    application.updated_at.date()
-                    - application.applied_date
-                ).days
-
-                stage_days[application.status.value].append(days)
-
-        time_in_stage = {
-            status: round(sum(days) / len(days), 2)
-            if days
-            else 0
-            for status, days in stage_days.items()
-        }
+        for status, average_days in stage_results:
+            if average_days is not None:
+                time_in_stage[status.value] = round(float(average_days), 2)
 
         # -------------------------
         # Best Day of Week
         # -------------------------
-        weekday_stats = {}
+        dow_stats = db.session.query(
+            db.func.extract('dow', JobApplication.applied_date).label('dow'),
+            db.func.count(JobApplication.id).label('total_apps'),
+            db.func.sum(
+                db.case(
+                    (JobApplication.status.in_([
+                        ApplicationStatus.INTERVIEW,
+                        ApplicationStatus.OFFER
+                    ]), 1),
+                    else_=0
+                )
+            ).label('successful_apps')
+        ).filter(
+            JobApplication.user_id == user_id
+        ).group_by(
+            db.func.extract('dow', JobApplication.applied_date)
+        ).all()
 
-        for application in applications:
-
-            day = application.applied_date.strftime("%A")
-
-            if day not in weekday_stats:
-                weekday_stats[day] = {
-                    "applications": 0,
-                    "successful": 0
-                }
-
-            weekday_stats[day]["applications"] += 1
-
-            if application.status in (
-                ApplicationStatus.INTERVIEW,
-                ApplicationStatus.OFFER
-            ):
-                weekday_stats[day]["successful"] += 1
-
-        best_day = None
+        best_day_index = None
         best_rate = -1
 
-        for day, stats in weekday_stats.items():
+        for row_dow, total_apps, successful_apps in dow_stats:
+            if total_apps > 0:
+                successful_count = float(successful_apps or 0)
+                rate = (successful_count / float(total_apps)) * 100
+                if rate > best_rate:
+                    best_rate = rate
+                    best_day_index = int(row_dow)
 
-            rate = (
-                stats["successful"] / stats["applications"]
-            ) * 100
-
-            if rate > best_rate:
-                best_rate = rate
-                best_day = day
-
-        best_day_of_week = {
-            "day": best_day,
-            "success_rate": round(best_rate, 2)
-            if best_rate >= 0
-            else 0
+        days_map = {
+            0: "Sunday",
+            1: "Monday",
+            2: "Tuesday",
+            3: "Wednesday",
+            4: "Thursday",
+            5: "Friday",
+            6: "Saturday"
         }
 
-        # -------------------------
-        # Status Counts
-        # -------------------------
-        by_status = {
-            status.value: sum(
-                1
-                for application in applications
-                if application.status == status
-            )
-            for status in ApplicationStatus
+        best_day_name = days_map.get(best_day_index) if best_day_index is not None else None
+
+        best_day_of_week = {
+            "day": best_day_name,
+            "success_rate": round(best_rate, 2) if best_rate >= 0 else 0
         }
 
         return {

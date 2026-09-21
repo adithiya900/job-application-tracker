@@ -30,16 +30,18 @@ class JobApplication(db.Model):
     )
 
     status = db.Column(
-        db.Enum(ApplicationStatus),
-        nullable=False,
-        default=ApplicationStatus.APPLIED
+       db.Enum(ApplicationStatus),
+       nullable=False,
+       default=ApplicationStatus.APPLIED,
+       index=True
     )
 
     # Automatically stores today's date
     applied_date = db.Column(
-        db.Date,
-        nullable=False,
-        default=date.today
+      db.Date,
+      nullable=False,
+      default=date.today,
+      index=True
     )
 
     updated_at = db.Column(
@@ -73,9 +75,10 @@ class JobApplication(db.Model):
     )
 
     user_id = db.Column(
-        db.Integer,
-        db.ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+      db.Integer,
+      db.ForeignKey("users.id", ondelete="CASCADE"),
+      nullable=False,
+      index=True
     )
 
     def __repr__(self):
