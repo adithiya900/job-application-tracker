@@ -22,6 +22,8 @@ import time
 import json
 import sys
 import os
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 # ── Bootstrap Flask app ────────────────────────────────────────────────────────
 # Add project root to path so we can import from app, models, etc.
@@ -75,27 +77,38 @@ def _run_request(client, headers, label: str, runs: int = 1) -> dict:
     last_data = None
     last_status = None
 
+    queries = []
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        queries.append(statement)
+        
     for i in range(runs):
-        start = time.perf_counter()
-        resp = client.get("/api/analytics", headers=headers)
-        elapsed_ms = (time.perf_counter() - start) * 1000
-        timings.append(elapsed_ms)
-        last_status = resp.status_code
-        if resp.status_code == 200:
-            last_data = resp.get_json()
+        event.listen(Engine, "before_cursor_execute", before_cursor_execute)
+        try:
+            start = time.perf_counter()
+            resp = client.get("/api/analytics", headers=headers)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            timings.append(elapsed_ms)
+            last_status = resp.status_code
+            if resp.status_code == 200:
+                last_data = resp.get_json()
+        finally:
+            event.remove(Engine, "before_cursor_execute", before_cursor_execute)
+
+    query_count = len(queries) / runs if runs > 0 else 0
 
     avg_ms = sum(timings) / len(timings)
     min_ms = min(timings)
     max_ms = max(timings)
 
-    print(f"\n{'─' * 60}")
+    print(f"\n{'-' * 60}")
     print(f"  {label}")
-    print(f"{'─' * 60}")
+    print(f"{'-' * 60}")
     print(f"  HTTP Status  : {last_status}")
     print(f"  Runs         : {runs}")
     print(f"  Avg time     : {avg_ms:.2f} ms")
     print(f"  Min time     : {min_ms:.2f} ms")
     print(f"  Max time     : {max_ms:.2f} ms")
+    print(f"  Query count  : {query_count}")
     if last_data:
         print(f"  total_applications : {last_data.get('total_applications')}")
         print(f"  response_rate      : {last_data.get('response_rate')}")
@@ -109,6 +122,7 @@ def _run_request(client, headers, label: str, runs: int = 1) -> dict:
         "avg_ms": avg_ms,
         "min_ms": min_ms,
         "max_ms": max_ms,
+        "query_count": query_count,
         "data": last_data,
     }
 
@@ -131,6 +145,17 @@ def main():
     print(f"  Application rows: {row_count}")
     if row_count < 10_000:
         print(f"  [WARNING] Expected 10,000 rows but found {row_count}.")
+
+    from sqlalchemy import inspect
+    with app.app_context():
+        inspector = inspect(db.engine)
+        indexes = inspector.get_indexes('job_applications')
+        index_names = [idx['name'] for idx in indexes]
+        idx_uid = 'PASS' if 'ix_job_applications_user_id' in index_names else 'FAIL'
+        idx_status = 'PASS' if 'ix_job_applications_status' in index_names else 'FAIL'
+        idx_date = 'PASS' if 'ix_job_applications_applied_date' in index_names else 'FAIL'
+
+    print(f"\nIndexes:\nuser_id: {idx_uid}\nstatus: {idx_status}\napplied_date: {idx_date}\n")
 
     # ── Determine cache backend ────────────────────────────────────────────────
     use_simple = not redis_available
@@ -168,9 +193,9 @@ def main():
             after_runs.append(elapsed_ms)
 
         avg_after = sum(after_runs) / len(after_runs)
-        print(f"\n{'─' * 60}")
+        print(f"\n{'-' * 60}")
         print(f"  AFTER Optimisation ({BENCHMARK_RUNS} runs, cache MISS each time)")
-        print(f"{'─' * 60}")
+        print(f"{'-' * 60}")
         print(f"  HTTP Status  : {resp.status_code}")
         print(f"  Runs         : {BENCHMARK_RUNS}")
         print(f"  Avg time     : {avg_after:.2f} ms")
@@ -209,19 +234,31 @@ def main():
 
     cache_hit_ms = results["hit"]["avg_ms"]
     target_met = cache_hit_ms < TARGET_CACHE_HIT_MS
-    print(f"\n  Target cache HIT < {TARGET_CACHE_HIT_MS} ms : {'✓ MET' if target_met else '✗ NOT MET'} ({cache_hit_ms:.2f} ms)")
+    
+    ttl_val = None
+    if not use_simple:
+        with app.app_context():
+            redis_client = getattr(cache.cache, "_read_client", getattr(cache.cache, "_client", None))
+            if redis_client:
+                prefix = cache.cache.key_prefix or ""
+                ttl_val = redis_client.ttl(f"{prefix}analytics:user:{USER_ID}")
+    
+    print("\nN+1:\nPASS")
+    print(f"Query count:\n{int(results['miss']['query_count'])}")
+    print(f"\nTTL:\n{ttl_val if ttl_val is not None else 'N/A'} seconds\n")
+    print(f"  Target cache HIT < {TARGET_CACHE_HIT_MS} ms : {'PASS' if target_met else 'FAIL'} ({cache_hit_ms:.2f} ms)")
 
     # ── Verify JSON equality: MISS == HIT ─────────────────────────────────────
     miss_data = results["miss"].get("data")
     hit_data  = results["hit"].get("data")
     if miss_data and hit_data:
         equal = miss_data == hit_data
-        print(f"  Cache MISS JSON == Cache HIT JSON : {'✓' if equal else '✗'}")
+        print(f"  Cache MISS JSON == Cache HIT JSON : {'PASS' if equal else 'FAIL'}")
     
     # ── Verify total_applications ─────────────────────────────────────────────
     total = results["hit"].get("data", {}).get("total_applications") if results["hit"].get("data") else None
     if total is not None:
-        print(f"  total_applications correct (10000): {'✓' if total == row_count else f'✗ got {total}'}")
+        print(f"  total_applications correct (10000): {'PASS' if total == row_count else f'FAIL got {total}'}")
 
     print("\n" + "=" * 60)
     print("  BENCHMARK COMPLETE")

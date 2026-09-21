@@ -1,4 +1,4 @@
-﻿"""
+"""
 Day 18 -- API & Web -- Performance Optimisation
 Tests for:
   - Analytics endpoint correctness
@@ -357,6 +357,80 @@ def test_by_status_has_all_values(client, test_app, perf_user, perf_applications
 def test_get_analytics_method_exists():
     """ApplicationService.get_analytics must exist."""
     from services.application_service import ApplicationService
-    assert hasattr(ApplicationService, "get_analytics"), \
-        "ApplicationService.get_analytics method must exist"
     assert callable(getattr(ApplicationService, "get_analytics"))
+
+
+# -----------------------------------------------
+# 15. Index existence
+# -----------------------------------------------
+
+def test_indexes_exist(test_app):
+    from sqlalchemy import inspect
+    with test_app.app_context():
+        inspector = inspect(db.engine)
+        indexes = inspector.get_indexes('job_applications')
+        index_names = [idx['name'] for idx in indexes]
+        assert 'ix_job_applications_user_id' in index_names
+        assert 'ix_job_applications_status' in index_names
+        assert 'ix_job_applications_applied_date' in index_names
+
+
+# -----------------------------------------------
+# 16. N+1 / query-count regression
+# -----------------------------------------------
+
+def test_no_n_plus_one_queries(client, test_app, perf_user, perf_applications, perf_headers):
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+
+    with test_app.app_context():
+        cache.clear()
+
+    query_count = [0]
+    
+    def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+        query_count[0] += 1
+        
+    event.listen(Engine, "before_cursor_execute", before_cursor_execute)
+    
+    try:
+        response = client.get("/api/analytics", headers=perf_headers)
+        assert response.status_code == 200
+        # The number of queries should be small and constant (e.g., < 10)
+        assert query_count[0] < 10, f"Query count too high: {query_count[0]}"
+    finally:
+        event.remove(Engine, "before_cursor_execute", before_cursor_execute)
+
+
+# -----------------------------------------------
+# 17. Redis cache backend and 300-second TTL
+# -----------------------------------------------
+
+def test_redis_cache_and_ttl(client, test_app, perf_user, perf_headers):
+    with test_app.app_context():
+        # Only run this test if Redis is the backend
+        if test_app.config["CACHE_TYPE"] != "RedisCache":
+            pytest.skip("Not using RedisCache")
+            
+        cache.clear()
+        
+    # MISS
+    response = client.get("/api/analytics", headers=perf_headers)
+    assert response.status_code == 200
+    
+    with test_app.app_context():
+        # Get actual redis client from flask-caching
+        # Flask-Caching's RedisCache stores the redis client in cache._client
+        # The default key prefix is flask_cache_ unless configured otherwise
+        redis_client = getattr(cache.cache, "_read_client", getattr(cache.cache, "_client", None))
+        if redis_client:
+            # Check key exists and has TTL
+            # Flask-Caching uses CACHE_KEY_PREFIX, default is often empty or depends on config
+            prefix = cache.cache.key_prefix or ""
+            key = f"{prefix}analytics:user:{perf_user}"
+            ttl = redis_client.ttl(key)
+            # The TTL should be 300 seconds. Depending on exact timing, it might be 299 or 300.
+            assert ttl > 0, "TTL must be set"
+            assert ttl <= 300, f"TTL too high: {ttl}"
+            assert ttl > 290, f"TTL too low: {ttl}"
+

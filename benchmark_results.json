@@ -1,24 +1,41 @@
 {
   "before": {
-    "ms": 61.57880008686334,
+    "label": "BEFORE Optimisation (cache MISS, baseline)",
     "status": 200,
-    "total": 10000
+    "avg_ms": 68.62799997907132,
+    "min_ms": 68.62799997907132,
+    "max_ms": 68.62799997907132,
+    "query_count": 4.0,
+    "total_applications": 10000
   },
   "after": {
-    "avg_ms": 29.75574000738561,
-    "min_ms": 27.904300019145012,
-    "max_ms": 33.78330008126795,
-    "status": 200
+    "label": "AFTER Optimisation",
+    "status": 200,
+    "avg_ms": 43.21463997475803,
+    "timings": [
+      34.818399930372834,
+      36.87990002799779,
+      55.492499959655106,
+      44.55760004930198,
+      44.32479990646243
+    ]
   },
   "miss": {
-    "ms": 31.221600016579032,
+    "label": "Cache MISS (cold, calculates analytics)",
     "status": 200,
-    "total": 10000
+    "avg_ms": 50.6232000188902,
+    "min_ms": 50.6232000188902,
+    "max_ms": 50.6232000188902,
+    "query_count": 4.0,
+    "total_applications": 10000
   },
   "hit": {
-    "avg_ms": 5.219820002093911,
-    "min_ms": 4.505400080233812,
-    "max_ms": 5.559799959883094,
-    "status": 200
+    "label": "Cache HIT  (warm, skips calculation) x5",
+    "status": 200,
+    "avg_ms": 5.73536001611501,
+    "min_ms": 4.4377000303938985,
+    "max_ms": 6.490499945357442,
+    "query_count": 1.0,
+    "total_applications": 10000
   }
 }
