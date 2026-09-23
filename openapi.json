@@ -1,0 +1,1218 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "description": "API documentation for the Job Application Tracker backend.",
+    "title": "Job Application Tracker API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5000"
+    }
+  ],
+  "tags": [],
+  "paths": {
+    "/api/jobs/search": {
+      "get": {
+        "tags": [
+          "Job Search"
+        ],
+        "summary": "Search external jobs via Adzuna API",
+        "description": "Search for jobs using the Adzuna API. Results are cached in Redis for 30 minutes. Requires JWT authentication.",
+        "parameters": [
+          {
+            "description": "Job search query (e.g. python, data engineer)",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "example": "python",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Location filter (e.g. chennai, bangalore)",
+            "in": "query",
+            "name": "location",
+            "required": false,
+            "schema": {
+              "example": "chennai",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page number (default: 1)",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Results per page (default: 5, max: 50)",
+            "in": "query",
+            "name": "per_page",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jobs retrieved successfully"
+          },
+          "400": {
+            "description": "Bad request - missing required parameter q"
+          },
+          "401": {
+            "description": "Unauthorized - JWT token missing or invalid"
+          },
+          "502": {
+            "description": "Bad Gateway - Adzuna API returned an error"
+          },
+          "503": {
+            "description": "Service Unavailable - Adzuna credentials not configured"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/applications": {
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Get all applications",
+        "parameters": [
+          {
+            "description": "Search company or role",
+            "in": "query",
+            "name": "search",
+            "type": "string"
+          },
+          {
+            "description": "Application status",
+            "in": "query",
+            "name": "status",
+            "type": "string"
+          },
+          {
+            "default": "newest",
+            "in": "query",
+            "name": "sort",
+            "type": "string"
+          },
+          {
+            "default": 1,
+            "in": "query",
+            "name": "page",
+            "type": "integer"
+          },
+          {
+            "default": 5,
+            "in": "query",
+            "name": "per_page",
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Applications retrieved successfully",
+            "headers": {
+              "X-Has-Next": {
+                "description": "Whether a next page exists (true/false)",
+                "type": "string"
+              },
+              "X-Has-Prev": {
+                "description": "Whether a previous page exists (true/false)",
+                "type": "string"
+              },
+              "X-Page": {
+                "description": "Current page number",
+                "type": "integer"
+              },
+              "X-Per-Page": {
+                "description": "Number of applications per page",
+                "type": "integer"
+              },
+              "X-Total-Count": {
+                "description": "Total number of applications matching query",
+                "type": "integer"
+              },
+              "X-Total-Pages": {
+                "description": "Total number of pages",
+                "type": "integer"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Create a new job application",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "company": {
+                    "example": "Google",
+                    "type": "string"
+                  },
+                  "notes": {
+                    "example": "Applied through careers page",
+                    "type": "string"
+                  },
+                  "role": {
+                    "example": "Software Engineer",
+                    "type": "string"
+                  },
+                  "status": {
+                    "example": "APPLIED",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "company",
+                  "role"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Application created successfully"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "Duplicate application"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/applications/bulk-status": {
+      "post": {
+        "tags": [
+          "Applications / Bulk Status Update"
+        ],
+        "summary": "Bulk update application statuses",
+        "description": "Updates the status of applications owned by the authenticated user. Missing or foreign application IDs are reported as per-ID errors while valid IDs continue to update.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "application_ids": {
+                    "example": [
+                      1,
+                      2,
+                      3
+                    ],
+                    "items": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "status": {
+                    "enum": [
+                      "APPLIED",
+                      "PHONE_SCREEN",
+                      "INTERVIEW",
+                      "OFFER",
+                      "REJECTED"
+                    ],
+                    "example": "INTERVIEW",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "application_ids",
+                  "status"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk status update completed. Valid owned IDs are updated and invalid or foreign IDs are reported in errors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "errors": {
+                      "items": {
+                        "properties": {
+                          "error": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "failed": {
+                      "example": 1,
+                      "type": "integer"
+                    },
+                    "message": {
+                      "example": "Bulk status update completed",
+                      "type": "string"
+                    },
+                    "updated": {
+                      "example": 2,
+                      "type": "integer"
+                    },
+                    "updated_ids": {
+                      "example": [
+                        1,
+                        2
+                      ],
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body, application IDs, or status value"
+          },
+          "401": {
+            "description": "Unauthorized - JWT token missing or invalid"
+          },
+          "500": {
+            "description": "Bulk status update failed unexpectedly"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/applications/export": {
+      "get": {
+        "tags": [
+          "Applications / CSV Export"
+        ],
+        "summary": "Export the authenticated user's applications as CSV",
+        "description": "Downloads all job applications belonging to the authenticated user as a CSV file.",
+        "responses": {
+          "200": {
+            "description": "Applications exported successfully as CSV",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "CSV download filename",
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - JWT token missing or invalid"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/applications/import": {
+      "post": {
+        "tags": [
+          "Applications / CSV Import"
+        ],
+        "summary": "Import applications from CSV",
+        "description": "Uploads a CSV file for the authenticated user. Valid rows are imported or updated, while invalid rows are skipped and returned in the error summary.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CSV import completed. The response includes imported and failed row counts. Valid rows are processed even when other rows fail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "errors": {
+                      "items": {
+                        "properties": {
+                          "data": {
+                            "type": "object"
+                          },
+                          "error": {
+                            "type": "string"
+                          },
+                          "row": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "failed": {
+                      "example": 1,
+                      "type": "integer"
+                    },
+                    "imported": {
+                      "example": 3,
+                      "type": "integer"
+                    },
+                    "message": {
+                      "example": "CSV import completed",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error, missing CSV file, invalid file type, or invalid CSV headers"
+          },
+          "401": {
+            "description": "Unauthorized - JWT token missing or invalid"
+          },
+          "500": {
+            "description": "CSV import failed unexpectedly"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/applications/import/errors": {
+      "get": {
+        "tags": [
+          "Applications / CSV Import"
+        ],
+        "summary": "Download CSV import error log",
+        "description": "Downloads the failed CSV import rows and their validation messages for the authenticated user.",
+        "responses": {
+          "200": {
+            "description": "CSV import error log downloaded successfully",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "CSV error-log download filename",
+                "type": "string"
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - JWT token missing or invalid"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/applications/stats": {
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Get application statistics (counts by status)",
+        "description": "Returns total applications and counts broken down by status. Also available at /api/applications/stats.",
+        "responses": {
+          "200": {
+            "description": "Application statistics retrieved successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/applications/{application_id}": {
+      "delete": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Delete application",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application deleted successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Application not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Get application by ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Application not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Partially update application",
+        "description": "Partially update one or more fields of an existing application. Fields not included remain unchanged. Also available at /api/applications/{application_id}.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "applied_date": {
+                    "example": "2026-09-04",
+                    "format": "date",
+                    "type": "string"
+                  },
+                  "company": {
+                    "example": "Google",
+                    "type": "string"
+                  },
+                  "notes": {
+                    "example": "Round 1 passed",
+                    "type": "string"
+                  },
+                  "role": {
+                    "example": "Senior Software Engineer",
+                    "type": "string"
+                  },
+                  "status": {
+                    "example": "INTERVIEW",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Application updated successfully"
+          },
+          "400": {
+            "description": "Validation Error / Invalid input"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Application not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Update application",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "company": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "example": "INTERVIEW",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Application updated successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Application not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/applications/{application_id}/resume": {
+      "get": {
+        "tags": [
+          "Resume"
+        ],
+        "summary": "Download application resume",
+        "parameters": [
+          {
+            "description": "Application ID",
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resume downloaded successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Resume or application not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Resume"
+        ],
+        "summary": "Upload resume for an application",
+        "parameters": [
+          {
+            "description": "Application ID",
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resume": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "resume"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resume uploaded successfully"
+          },
+          "400": {
+            "description": "Invalid or missing resume file"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Application not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/applications/{application_id}/resume/text": {
+      "get": {
+        "tags": [
+          "Resume"
+        ],
+        "summary": "Extract text from application resume",
+        "parameters": [
+          {
+            "description": "Application ID",
+            "in": "path",
+            "name": "application_id",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resume text extracted successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Resume or application not found"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/dashboard/statistics": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Get dashboard statistics",
+        "responses": {
+          "200": {
+            "description": "Statistics retrieved successfully"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Login user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "email": {
+                    "example": "adithiya@email.com",
+                    "type": "string"
+                  },
+                  "password": {
+                    "example": "password123",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful. Access and refresh tokens are returned."
+          },
+          "400": {
+            "description": "Email and password are required"
+          },
+          "401": {
+            "description": "Invalid email or password"
+          }
+        }
+      }
+    },
+    "/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Logout user",
+        "description": "Revoke the current access token and logout the user. Enter the access token in the Authorization header as: Bearer <access_token>",
+        "responses": {
+          "200": {
+            "description": "Logout successful! Token revoked."
+          },
+          "401": {
+            "description": "Authorization token is missing, invalid, expired, or revoked"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/refresh": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Refresh access token",
+        "description": "Generate a new access token using a valid refresh token. Enter the refresh token in the Authorization header as: Bearer <refresh_token>",
+        "responses": {
+          "200": {
+            "description": "Access token refreshed successfully"
+          },
+          "401": {
+            "description": "Refresh token missing, invalid, expired, or revoked"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/register": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Register a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "email": {
+                    "example": "adithiya@email.com",
+                    "type": "string"
+                  },
+                  "name": {
+                    "example": "Adithiya",
+                    "type": "string"
+                  },
+                  "password": {
+                    "example": "password123",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "password"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully"
+          },
+          "400": {
+            "description": "Name, email and password are required"
+          },
+          "409": {
+            "description": "Email already registered"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health check",
+        "description": "Returns health of the Flask app, PostgreSQL database and Redis cache. No authentication required.",
+        "responses": {
+          "200": {
+            "description": "Service health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "healthy"
+                    },
+                    "database": {
+                      "type": "string",
+                      "example": "healthy"
+                    },
+                    "redis": {
+                      "type": "string",
+                      "example": "healthy"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "A component is unhealthy"
+          }
+        }
+      }
+    },
+    "/api/analytics": {
+      "get": {
+        "tags": [
+          "Statistics"
+        ],
+        "summary": "Advanced analytics",
+        "description": "Aggregated analytics for the authenticated user (Redis cached 300s). Requires JWT.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analytics data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - JWT token missing or invalid"
+          },
+          "500": {
+            "description": "Internal error"
+          }
+        }
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List all users (admin only)",
+        "description": "Returns all users with id, name, email, role and is_current_user flag. Requires admin JWT.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    },
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "is_current_user": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not an admin"
+          }
+        }
+      }
+    },
+    "/api/admin/users/{user_id}/impersonate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Impersonate a user (admin only)",
+        "description": "Creates an access token for the target user (audited). Admin cannot impersonate themselves.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Target user id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Impersonation token created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "impersonated_user": {
+                      "type": "object"
+                    },
+                    "access_token": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Admin cannot impersonate themselves"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not an admin"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/api/admin/users/{user_id}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Delete a user (admin only)",
+        "description": "Deletes the target user and creates an audit log entry. Admin cannot delete themselves.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Target user id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deleted successfully"
+          },
+          "400": {
+            "description": "Admin cannot delete themselves"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden - not an admin"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "description": "Enter your JWT token like this: Bearer <your_token>",
+        "in": "header",
+        "name": "Authorization",
+        "type": "apiKey"
+      }
+    }
+  }
+}

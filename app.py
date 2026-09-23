@@ -8,6 +8,7 @@ from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 import json
 from dotenv import load_dotenv
+load_dotenv()
 import os
 import socket
 import smtplib
@@ -136,7 +137,9 @@ app = Flask(__name__)
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
-    default_limits=["100 per minute"]
+    default_limits=[
+        os.getenv("RATE_LIMIT_DEFAULT", "100 per minute")
+    ]
 )
 CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
