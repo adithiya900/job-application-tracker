@@ -39,3 +39,8 @@
 .card button {
   margin-top: 12px;
 }
+.form-error {
+  margin-top: 4px;
+  color: #dc2626;
+  font-size: 14px;
+}

@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Applications from './pages/Applications';
 import ComponentsDemo from './pages/ComponentsDemo';
+import AddApplication from './pages/AddApplication';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="applications" element={<Applications />} />
           <Route path="components-demo" element={<ComponentsDemo />} />
+          <Route path="applications/add" element={<AddApplication />} />
         </Route>
       </Routes>
     </BrowserRouter>
