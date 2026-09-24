@@ -141,7 +141,7 @@ limiter = Limiter(
         os.getenv("RATE_LIMIT_DEFAULT", "100 per minute")
     ]
 )
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
 
 
 @app.after_request

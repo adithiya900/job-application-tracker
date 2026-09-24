@@ -1,6 +1,6 @@
 import pytest
+from datetime import date
 from unittest.mock import patch
-
 from extensions import db
 from models.job import JobApplication, ApplicationStatus
 from services.application_service import ApplicationService
@@ -22,7 +22,8 @@ def test_create_application(
         "company": "Google",
         "role": "Software Engineer",
         "status": ApplicationStatus.APPLIED,
-        "notes": "Applied through careers page"
+        "notes": "Applied through careers page",
+        "applied_date": date(2026, 1, 10),
     }
 
     application = ApplicationService.create_application(
@@ -35,7 +36,7 @@ def test_create_application(
     assert application.role == "Software Engineer"
     assert application.status == ApplicationStatus.APPLIED
     assert application.user_id == test_user.id
-
+    assert application.applied_date == date(2026, 1, 10)
 
 # ==========================================
 # Create Application - Default Status

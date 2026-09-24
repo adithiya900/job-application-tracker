@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useApplications } from '../contexts/ApplicationContext';
 
 const applicationSchema = z.object({
   company: z.string().min(2, 'Company name is required'),
@@ -15,6 +16,12 @@ const applicationSchema = z.object({
 
 function AddApplication() {
   const [formNote, setFormNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [createdApplication, setCreatedApplication] = useState(null);
+
+  const { applications, addApplicationOptimistically } = useApplications();
+  const pendingApplication = applications.find((application) => application.optimistic);
 
   const {
     register,
@@ -24,13 +31,53 @@ function AddApplication() {
     resolver: zodResolver(applicationSchema),
   });
 
-  const onSubmit = (data) => {
-    console.log('Application data:', data);
+  const onSubmit = async (data) => {
+    try {
+      setSubmitting(true);
+      setSubmitError('');
+      setCreatedApplication(null);
+
+      const statusMap = {
+        Applied: 'APPLIED',
+        Interview: 'INTERVIEW',
+        Selected: 'OFFER',
+        Rejected: 'REJECTED',
+      };
+
+      const created = await addApplicationOptimistically({
+        company: data.company,
+        role: data.role,
+        status: statusMap[data.status],
+        notes: data.notes,
+        applied_date: data.date,
+      });
+
+      setCreatedApplication(created);
+      console.log('Application created successfully');
+    } catch (error) {
+      console.error('Failed to create application:', error);
+      setSubmitError('Failed to create application. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div>
       <h1>Add Application</h1>
+
+      {submitError && (
+        <p className="form-error">{submitError}</p>
+      )}
+
+      {(pendingApplication || createdApplication) && (
+        <div>
+          <h3>{(pendingApplication || createdApplication).company}</h3>
+          <p>{(pendingApplication || createdApplication).role}</p>
+          <p>{(pendingApplication || createdApplication).status}</p>
+          {pendingApplication && <p>Saving...</p>}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <div>
@@ -105,7 +152,9 @@ function AddApplication() {
           )}
         </div>
 
-        <button type="submit">Add Application</button>
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Adding...' : 'Add Application'}
+        </button>
       </form>
     </div>
   );

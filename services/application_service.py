@@ -68,6 +68,9 @@ class ApplicationService:
             user_id=user_id
         )
 
+        if "applied_date" in data:
+            new_application.applied_date = data["applied_date"]
+
         db.session.add(new_application)
         try:
             db.session.commit()
