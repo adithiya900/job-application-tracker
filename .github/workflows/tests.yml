@@ -24,11 +24,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r backend/requirements.txt
 
       - name: Run tests with coverage
         env:
           DATABASE_URL: "sqlite:///:memory:"
           JWT_SECRET_KEY: "test-secret-key"
+        working-directory: backend
         run: |
           pytest --cov=. --cov-report=term-missing
