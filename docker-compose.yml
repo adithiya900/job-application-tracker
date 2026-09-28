@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: job_tracker
       POSTGRES_USER: job_tracker
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-job_tracker_dev_only}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env before starting Docker Compose}
     ports:
       - "5432:5432"
     volumes:
@@ -32,9 +32,9 @@ services:
     ports:
       - "5000:5000"
     environment:
-      DATABASE_URL: postgresql://job_tracker:${POSTGRES_PASSWORD:-job_tracker_dev_only}@postgres:5432/job_tracker
+      DATABASE_URL: postgresql://job_tracker:${POSTGRES_PASSWORD}@postgres:5432/job_tracker
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-docker-development-secret}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env before starting Docker Compose}
       ADZUNA_APP_ID: ${ADZUNA_APP_ID:-}
       ADZUNA_APP_KEY: ${ADZUNA_APP_KEY:-}
       ADZUNA_COUNTRY: ${ADZUNA_COUNTRY:-in}
@@ -51,6 +51,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=5)\""]
       interval: 10s
@@ -63,13 +64,58 @@ services:
       dockerfile: Dockerfile
     command: ["celery", "-A", "celery_app.celery", "worker", "--loglevel=info", "--pool=solo"]
     environment:
-      DATABASE_URL: postgresql://job_tracker:${POSTGRES_PASSWORD:-job_tracker_dev_only}@postgres:5432/job_tracker
+      DATABASE_URL: postgresql://job_tracker:${POSTGRES_PASSWORD}@postgres:5432/job_tracker
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-docker-development-secret}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env before starting Docker Compose}
       SCHEDULER_ENABLED: "false"
     depends_on:
       redis:
         condition: service_healthy
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "scheduler.run_scheduler"]
+    environment:
+      DATABASE_URL: postgresql://job_tracker:${POSTGRES_PASSWORD}@postgres:5432/job_tracker
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env before starting Docker Compose}
+      MAIL_SERVER: ${MAIL_SERVER:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USE_TLS: ${MAIL_USE_TLS:-true}
+      MAIL_USE_SSL: ${MAIL_USE_SSL:-false}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-}
+      SCHEDULER_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  test:
+    profiles:
+      - test
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["pytest", "-q"]
+    environment:
+      DATABASE_URL: postgresql://job_tracker:${POSTGRES_PASSWORD}@postgres:5432/job_tracker
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env before starting Docker Compose}
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "0"
 
   flower:
     build:

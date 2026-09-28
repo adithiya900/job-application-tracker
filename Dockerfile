@@ -1,8 +1,8 @@
 FROM python:3.12-slim AS builder
 
-WORKDIR /app
+WORKDIR /app/backend
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 RUN python -m pip install --upgrade pip && \
     pip install --no-cache-dir --prefix=/install -r requirements.txt
@@ -10,10 +10,10 @@ RUN python -m pip install --upgrade pip && \
 
 FROM python:3.12-slim AS runtime
 
-WORKDIR /app
+WORKDIR /app/backend
 
 COPY --from=builder /install /usr/local
-COPY . .
+COPY backend/ .
 
 RUN useradd --create-home --shell /bin/bash appuser && \
     chown -R appuser:appuser /app

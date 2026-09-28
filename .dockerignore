@@ -19,9 +19,10 @@ check_indexes.py
 debug_redis.py
 _db_peer_probe.py
 day2_orm.py
-seed.py
 applications.csv
 import_errors.csv
 *.md
+!Changelog.md
+!MIGRATION_V1_TO_V2.md
 logfile
 *.postman_collection.json

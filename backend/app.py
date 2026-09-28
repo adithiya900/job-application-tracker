@@ -2073,23 +2073,8 @@ def home():
 
 
 # =========================
-# Run Application
+# Container startup
 # =========================
-
-if __name__ == "__main__":
-
-    start_scheduler(app)
-
-    # Safe Mail Configuration Debug Output
-    print("=" * 40)
-    print("Email Configuration Status:")
-    print(f"MAIL_SERVER: {app.config.get('MAIL_SERVER')}")
-    print(f"MAIL_PORT: {app.config.get('MAIL_PORT')}")
-    print(f"MAIL_USE_TLS: {app.config.get('MAIL_USE_TLS')}")
-    print(f"MAIL_USE_SSL: {app.config.get('MAIL_USE_SSL')}")
-    print(f"MAIL_USERNAME configured: {bool(app.config.get('MAIL_USERNAME'))}")
-    print(f"MAIL_PASSWORD configured: {bool(app.config.get('MAIL_PASSWORD'))}")
-    print(f"MAIL_DEFAULT_SENDER: {app.config.get('MAIL_DEFAULT_SENDER')}")
-    print("=" * 40)
-
-    app.run(debug=True)
+# The Docker image starts the WSGI application with Gunicorn. Keeping
+# development startup out of the module prevents a second host-side Flask
+# process and avoids the debug reloader creating duplicate workers.

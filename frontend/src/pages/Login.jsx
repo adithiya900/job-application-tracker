@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../services/api";
+import { useAuth } from "../contexts/AuthContext";
 
 function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -11,14 +13,9 @@ function Login() {
     e.preventDefault();
 
     try {
-      const response = await api.post("/login", {
-        email,
-        password,
-      });
+      await login(email, password);
 
-      localStorage.setItem("access_token", response.data.access_token);
-
-      console.log("Login successful:", response.data);
+      console.log("Login successful");
 
       navigate("/applications");
     } catch (error) {
