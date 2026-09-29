@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useApplications } from '../contexts/ApplicationContext';
+import useApplicationStore from '../stores/applicationStore';
 
 const applicationSchema = z.object({
   company: z.string().min(2, 'Company name is required'),
@@ -20,8 +20,17 @@ function AddApplication() {
   const [submitError, setSubmitError] = useState('');
   const [createdApplication, setCreatedApplication] = useState(null);
 
-  const { applications, addApplicationOptimistically } = useApplications();
-  const pendingApplication = applications.find((application) => application.optimistic);
+  const applications = useApplicationStore(
+    (state) => state.applications
+  );
+
+  const addApplication = useApplicationStore(
+    (state) => state.addApplication
+  );
+
+  const pendingApplication = applications.find(
+    (application) => application.optimistic
+  );
 
   const {
     register,
@@ -44,7 +53,7 @@ function AddApplication() {
         Rejected: 'REJECTED',
       };
 
-      const created = await addApplicationOptimistically({
+      const created = await addApplication({
         company: data.company,
         role: data.role,
         status: statusMap[data.status],
@@ -56,7 +65,9 @@ function AddApplication() {
       console.log('Application created successfully');
     } catch (error) {
       console.error('Failed to create application:', error);
-      setSubmitError('Failed to create application. Please try again.');
+      setSubmitError(
+        'Failed to create application. Please try again.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -72,9 +83,18 @@ function AddApplication() {
 
       {(pendingApplication || createdApplication) && (
         <div>
-          <h3>{(pendingApplication || createdApplication).company}</h3>
-          <p>{(pendingApplication || createdApplication).role}</p>
-          <p>{(pendingApplication || createdApplication).status}</p>
+          <h3>
+            {(pendingApplication || createdApplication).company}
+          </h3>
+
+          <p>
+            {(pendingApplication || createdApplication).role}
+          </p>
+
+          <p>
+            {(pendingApplication || createdApplication).status}
+          </p>
+
           {pendingApplication && <p>Saving...</p>}
         </div>
       )}
@@ -82,6 +102,7 @@ function AddApplication() {
       <form onSubmit={handleSubmit(onSubmit)}>
         <div>
           <label htmlFor="company">Company</label>
+
           <input
             id="company"
             type="text"
@@ -89,12 +110,15 @@ function AddApplication() {
           />
 
           {errors.company && (
-            <p className="form-error">{errors.company.message}</p>
+            <p className="form-error">
+              {errors.company.message}
+            </p>
           )}
         </div>
 
         <div>
           <label htmlFor="role">Role</label>
+
           <input
             id="role"
             type="text"
@@ -102,7 +126,9 @@ function AddApplication() {
           />
 
           {errors.role && (
-            <p className="form-error">{errors.role.message}</p>
+            <p className="form-error">
+              {errors.role.message}
+            </p>
           )}
         </div>
 
@@ -118,12 +144,15 @@ function AddApplication() {
           </select>
 
           {errors.status && (
-            <p className="form-error">{errors.status.message}</p>
+            <p className="form-error">
+              {errors.status.message}
+            </p>
           )}
         </div>
 
         <div>
           <label htmlFor="date">Date</label>
+
           <input
             id="date"
             type="date"
@@ -131,7 +160,9 @@ function AddApplication() {
           />
 
           {errors.date && (
-            <p className="form-error">{errors.date.message}</p>
+            <p className="form-error">
+              {errors.date.message}
+            </p>
           )}
         </div>
 
@@ -142,13 +173,17 @@ function AddApplication() {
             id="notes"
             rows="4"
             {...register('notes')}
-            onChange={(event) => setFormNote(event.target.value)}
+            onChange={(event) =>
+              setFormNote(event.target.value)
+            }
           />
 
           <p>Characters: {formNote.length}</p>
 
           {errors.notes && (
-            <p className="form-error">{errors.notes.message}</p>
+            <p className="form-error">
+              {errors.notes.message}
+            </p>
           )}
         </div>
 
