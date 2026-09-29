@@ -1,4 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
+
+import { Toaster } from "@/components/ui/sonner";
 
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
@@ -14,31 +17,48 @@ import PrivateRoute from "./routes/PrivateRoute";
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ApplicationProvider>
-          <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Home />} />
-              <Route path="login" element={<Login />} />
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+    >
+      <Toaster />
 
-              <Route element={<PrivateRoute />}>
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="applications" element={<Applications />} />
-                <Route
-                  path="components-demo"
-                  element={<ComponentsDemo />}
-                />
-                <Route
-                  path="applications/add"
-                  element={<AddApplication />}
-                />
+      <BrowserRouter>
+        <AuthProvider>
+          <ApplicationProvider>
+            <Routes>
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Home />} />
+                <Route path="login" element={<Login />} />
+
+                <Route element={<PrivateRoute />}>
+                  <Route
+                    path="dashboard"
+                    element={<Dashboard />}
+                  />
+
+                  <Route
+                    path="applications"
+                    element={<Applications />}
+                  />
+
+                  <Route
+                    path="components-demo"
+                    element={<ComponentsDemo />}
+                  />
+
+                  <Route
+                    path="applications/add"
+                    element={<AddApplication />}
+                  />
+                </Route>
               </Route>
-            </Route>
-          </Routes>
-        </ApplicationProvider>
-      </AuthProvider>
-    </BrowserRouter>
+            </Routes>
+          </ApplicationProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
 

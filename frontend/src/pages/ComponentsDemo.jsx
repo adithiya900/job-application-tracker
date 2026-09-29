@@ -7,6 +7,15 @@ import Card from '../components/Card';
 import Input from '../components/Input';
 import StatusBadge from '../components/StatusBadge';
 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+
 function ComponentsDemo() {
   const [name, setName] = useState('');
 
@@ -55,6 +64,31 @@ function ComponentsDemo() {
 
       <h2>ApplicationCard</h2>
       <ApplicationCard application={application} />
+      <h2>Table</h2>
+
+<div className="rounded-md border">
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead>Company</TableHead>
+        <TableHead>Role</TableHead>
+        <TableHead>Status</TableHead>
+        <TableHead>Applied Date</TableHead>
+        <TableHead>Location</TableHead>
+      </TableRow>
+    </TableHeader>
+
+    <TableBody>
+      <TableRow>
+        <TableCell>{application.company}</TableCell>
+        <TableCell>{application.jobTitle}</TableCell>
+        <TableCell>{application.status}</TableCell>
+        <TableCell>{application.appliedDate}</TableCell>
+        <TableCell>{application.location}</TableCell>
+      </TableRow>
+    </TableBody>
+  </Table>
+</div>
     </div>
   );
 }

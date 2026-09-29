@@ -5,6 +5,16 @@ import useApplicationStore, {
   selectFilteredApplications,
 } from "../stores/applicationStore";
 
+import ApplicationCard from "../components/ApplicationCard";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 function Applications() {
   const [searchParams, setSearchParams] =
     useSearchParams();
@@ -201,152 +211,160 @@ function Applications() {
     return <p>{error}</p>;
   }
 
-  return (
+return (
+  <div>
+    <h1>Applications Page</h1>
+
+    {/* Search */}
     <div>
-      <h1>Applications Page</h1>
+      <label htmlFor="search-filter">
+        Search:
+      </label>
 
-      {/* Search */}
-      <div>
-        <label htmlFor="search-filter">
-          Search:
-        </label>
-
-        <input
-          id="search-filter"
-          type="text"
-          value={filters.search}
-          placeholder="Search company or role"
-          onChange={handleSearchChange}
-        />
-      </div>
-
-      {/* Sort */}
-      <div>
-        <label htmlFor="sort-filter">
-          Sort:
-        </label>
-
-        <select
-          id="sort-filter"
-          value={filters.sort}
-          onChange={handleSortChange}
-        >
-          <option value="newest">
-            Newest
-          </option>
-
-          <option value="oldest">
-            Oldest
-          </option>
-
-          <option value="company">
-            Company
-          </option>
-        </select>
-      </div>
-
-      {/* Status Filter */}
-      <div>
-        <label htmlFor="status-filter">
-          Filter by Status:
-        </label>
-
-        <select
-          id="status-filter"
-          value={filters.status}
-          onChange={handleStatusChange}
-        >
-          <option value="">
-            All
-          </option>
-
-          <option value="APPLIED">
-            Applied
-          </option>
-
-          <option value="INTERVIEW">
-            Interview
-          </option>
-
-          <option value="OFFER">
-            Selected
-          </option>
-
-          <option value="REJECTED">
-            Rejected
-          </option>
-        </select>
-      </div>
-
-      {/* Applications */}
-      {applications.length === 0 ? (
-        <p>No applications found.</p>
-      ) : (
-        applications.map((application) => (
-          <div key={application.id}>
-            <h3>
-              {application.company}
-            </h3>
-
-            <p>
-              {application.role}
-            </p>
-
-            <p>
-              {application.status}
-            </p>
-
-            <p>
-              {application.applied_date}
-            </p>
-
-            <p>
-              {application.notes}
-            </p>
-
-            {application.optimistic && (
-              <p>Saving...</p>
-            )}
-          </div>
-        ))
-      )}
-
-      {/* Pagination */}
-      {pagination.pages > 1 && (
-        <div>
-          <button
-            type="button"
-            disabled={!pagination.has_prev}
-            onClick={() =>
-              handlePageChange(
-                pagination.page - 1
-              )
-            }
-          >
-            Previous
-          </button>
-
-          <span>
-            {" "}
-            Page {pagination.page} of{" "}
-            {pagination.pages}{" "}
-          </span>
-
-          <button
-            type="button"
-            disabled={!pagination.has_next}
-            onClick={() =>
-              handlePageChange(
-                pagination.page + 1
-              )
-            }
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <input
+        id="search-filter"
+        type="text"
+        value={filters.search}
+        placeholder="Search company or role"
+        onChange={handleSearchChange}
+      />
     </div>
-  );
-}
 
+    {/* Sort */}
+    <div className="space-y-2">
+  <label
+    htmlFor="sort-filter"
+    className="text-sm font-medium"
+  >
+    Sort:
+  </label>
+
+  <Select
+    value={filters.sort}
+    onValueChange={(value) => {
+      handleSortChange({
+        target: {
+          value,
+        },
+      });
+    }}
+  >
+    <SelectTrigger
+      id="sort-filter"
+      className="w-full sm:w-[200px]"
+    >
+      <SelectValue placeholder="Sort applications" />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="newest">
+        Newest
+      </SelectItem>
+
+      <SelectItem value="oldest">
+        Oldest
+      </SelectItem>
+
+      <SelectItem value="company">
+        Company
+      </SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+
+    {/* Status Filter */}
+    <div className="space-y-2">
+  <label
+    htmlFor="status-filter"
+    className="text-sm font-medium"
+  >
+    Filter by Status:
+  </label>
+
+  <Select
+    value={filters.status || "ALL"}
+    onValueChange={(value) => {
+      handleStatusChange({
+        target: {
+          value: value === "ALL" ? "" : value,
+        },
+      });
+    }}
+  >
+    <SelectTrigger
+      id="status-filter"
+      className="w-full sm:w-[200px]"
+    >
+      <SelectValue placeholder="Filter by status" />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="ALL">
+        All
+      </SelectItem>
+
+      <SelectItem value="APPLIED">
+        Applied
+      </SelectItem>
+
+      <SelectItem value="INTERVIEW">
+        Interview
+      </SelectItem>
+
+      <SelectItem value="OFFER">
+        Selected
+      </SelectItem>
+
+      <SelectItem value="REJECTED">
+        Rejected
+      </SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+
+    {/* Applications */}
+    {applications.length === 0 ? (
+      <p>No applications found.</p>
+    ) : (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {applications.map((application) => (
+          <ApplicationCard
+            key={application.id}
+            application={application}
+          />
+        ))}
+      </div>
+    )}
+
+    {/* Pagination */}
+    {pagination.pages > 1 && (
+      <div>
+        <button
+          type="button"
+          disabled={!pagination.has_prev}
+          onClick={() =>
+            handlePageChange(pagination.page - 1)
+          }
+        >
+          Previous
+        </button>
+
+        <span>
+          {" "}
+          Page {pagination.page} of {pagination.pages}{" "}
+        </span>
+
+        <button
+          type="button"
+          disabled={!pagination.has_next}
+          onClick={() =>
+            handlePageChange(pagination.page + 1)
+          }
+        >
+          Next
+        </button>
+      </div>
+    )}
+  </div>
+)};
 export default Applications;

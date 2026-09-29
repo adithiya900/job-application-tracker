@@ -1,8 +1,10 @@
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import useApplicationStore from '../stores/applicationStore';
+import { toast } from 'sonner';
 
 const applicationSchema = z.object({
   company: z.string().min(2, 'Company name is required'),
@@ -62,12 +64,20 @@ function AddApplication() {
       });
 
       setCreatedApplication(created);
-      console.log('Application created successfully');
+
+      toast.success('Application added successfully', {
+        description: `${created.company} - ${created.role}`,
+      });
     } catch (error) {
       console.error('Failed to create application:', error);
+
       setSubmitError(
         'Failed to create application. Please try again.'
       );
+
+      toast.error('Failed to add application', {
+        description: 'Please check the form and try again.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -137,10 +147,22 @@ function AddApplication() {
 
           <select id="status" {...register('status')}>
             <option value="">Select Status</option>
-            <option value="Applied">Applied</option>
-            <option value="Interview">Interview</option>
-            <option value="Selected">Selected</option>
-            <option value="Rejected">Rejected</option>
+
+            <option value="Applied">
+              Applied
+            </option>
+
+            <option value="Interview">
+              Interview
+            </option>
+
+            <option value="Selected">
+              Selected
+            </option>
+
+            <option value="Rejected">
+              Rejected
+            </option>
           </select>
 
           {errors.status && (
@@ -187,7 +209,10 @@ function AddApplication() {
           )}
         </div>
 
-        <button type="submit" disabled={submitting}>
+        <button
+          type="submit"
+          disabled={submitting}
+        >
           {submitting ? 'Adding...' : 'Add Application'}
         </button>
       </form>
@@ -196,3 +221,4 @@ function AddApplication() {
 }
 
 export default AddApplication;
+
