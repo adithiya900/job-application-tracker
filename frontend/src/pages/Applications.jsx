@@ -1,11 +1,19 @@
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import {
+  createPaginatedRowModel,
+  createSortedRowModel,
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  tableFeatures,
+  useTable,
+} from "@tanstack/react-table";
+
 import useApplicationStore, {
   selectFilteredApplications,
 } from "../stores/applicationStore";
-
-import ApplicationCard from "../components/ApplicationCard";
 
 import {
   Select,
@@ -14,6 +22,93 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const features = tableFeatures({
+  rowSortingFeature,
+  rowSelectionFeature,
+  rowPaginationFeature,
+  sortedRowModel: createSortedRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+});
+
+const columns = [
+  {
+    accessorKey: "company",
+    header: "Company",
+  },
+  {
+    accessorKey: "role",
+    header: "Role",
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+  },
+  {
+    accessorKey: "applied_date",
+    header: "Applied Date",
+  },
+  {
+    accessorKey: "notes",
+    header: "Notes",
+  },
+];
+
+// --------------------------------------------------
+// CSV Export
+// --------------------------------------------------
+
+const exportApplicationsToCSV = (applications) => {
+  const headers = [
+    "Company",
+    "Role",
+    "Status",
+    "Applied Date",
+    "Notes",
+  ];
+
+  const rows = applications.map((application) => [
+    application.company,
+    application.role,
+    application.status,
+    application.applied_date,
+    application.notes,
+  ]);
+
+  const csvContent = [
+    headers,
+    ...rows,
+  ]
+    .map((row) =>
+      row
+        .map((value) => {
+          const text = value ?? "";
+
+          return `"${String(text).replace(/"/g, '""')}"`;
+        })
+        .join(",")
+    )
+    .join("\n");
+
+  const blob = new Blob([csvContent], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "applications.csv";
+
+  document.body.appendChild(link);
+
+  link.click();
+
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+};
 
 function Applications() {
   const [searchParams, setSearchParams] =
@@ -59,7 +154,10 @@ function Applications() {
     (state) => state.setPage
   );
 
-  // URL -> Zustand when page loads
+  // --------------------------------------------------
+  // Read filters and page from URL
+  // --------------------------------------------------
+
   useEffect(() => {
     const statusFromUrl =
       searchParams.get("status") || "";
@@ -90,7 +188,10 @@ function Applications() {
     }
   }, []);
 
-  // Fetch applications when filters or page change
+  // --------------------------------------------------
+  // Fetch applications whenever filters/page change
+  // --------------------------------------------------
+
   useEffect(() => {
     fetchApplications();
   }, [
@@ -101,8 +202,13 @@ function Applications() {
     pagination.page,
   ]);
 
-  const handleStatusChange = (event) => {
-    const status = event.target.value;
+  // --------------------------------------------------
+  // Status filter
+  // --------------------------------------------------
+
+  const handleStatusChange = (value) => {
+    const status =
+      value === "ALL" ? "" : value;
 
     setStatusFilter(status);
 
@@ -119,6 +225,10 @@ function Applications() {
 
     setSearchParams(nextParams);
   };
+
+  // --------------------------------------------------
+  // Search filter
+  // --------------------------------------------------
 
   const handleSearchChange = (event) => {
     const search = event.target.value;
@@ -139,16 +249,18 @@ function Applications() {
     setSearchParams(nextParams);
   };
 
-  const handleSortChange = (event) => {
-    const sort = event.target.value;
+  // --------------------------------------------------
+  // Sort
+  // --------------------------------------------------
 
-    setSort(sort);
+  const handleSortChange = (value) => {
+    setSort(value);
 
     const nextParams =
       new URLSearchParams(searchParams);
 
-    if (sort && sort !== "newest") {
-      nextParams.set("sort", sort);
+    if (value && value !== "newest") {
+      nextParams.set("sort", value);
     } else {
       nextParams.delete("sort");
     }
@@ -158,8 +270,23 @@ function Applications() {
     setSearchParams(nextParams);
   };
 
+  // --------------------------------------------------
+  // Pagination
+  // --------------------------------------------------
+
   const handlePageChange = (page) => {
-    setPage(page);
+    const totalPages =
+      pagination.pages || 1;
+
+    const requestedPage =
+      Number(page) || 1;
+
+    const nextPage = Math.min(
+      Math.max(requestedPage, 1),
+      totalPages
+    );
+
+    setPage(nextPage);
 
     const nextParams =
       new URLSearchParams(searchParams);
@@ -182,7 +309,10 @@ function Applications() {
       nextParams.delete("search");
     }
 
-    if (filters.sort && filters.sort !== "newest") {
+    if (
+      filters.sort &&
+      filters.sort !== "newest"
+    ) {
       nextParams.set(
         "sort",
         filters.sort
@@ -191,10 +321,10 @@ function Applications() {
       nextParams.delete("sort");
     }
 
-    if (page > 1) {
+    if (nextPage > 1) {
       nextParams.set(
         "page",
-        String(page)
+        String(nextPage)
       );
     } else {
       nextParams.delete("page");
@@ -203,168 +333,366 @@ function Applications() {
     setSearchParams(nextParams);
   };
 
+  // --------------------------------------------------
+  // TanStack Table
+  // --------------------------------------------------
+
+  const table = useTable({
+    key: "applications-table",
+    features,
+    data: applications,
+    columns,
+    initialState: {
+      pagination: {
+        pageIndex: 0,
+        pageSize: 10,
+      },
+    },
+  });
+
+  // --------------------------------------------------
+  // Loading
+  // --------------------------------------------------
+
   if (loading) {
-    return <p>Loading applications...</p>;
+    return (
+      <p>
+        Loading applications...
+      </p>
+    );
   }
+
+  // --------------------------------------------------
+  // Error
+  // --------------------------------------------------
 
   if (error) {
-    return <p>{error}</p>;
+    return (
+      <p>
+        {error}
+      </p>
+    );
   }
 
-return (
-  <div>
-    <h1>Applications Page</h1>
+  // --------------------------------------------------
+  // UI
+  // --------------------------------------------------
 
-    {/* Search */}
-    <div>
-      <label htmlFor="search-filter">
-        Search:
-      </label>
+  return (
+    <div className="space-y-6">
 
-      <input
-        id="search-filter"
-        type="text"
-        value={filters.search}
-        placeholder="Search company or role"
-        onChange={handleSearchChange}
-      />
-    </div>
+      {/* Page Header */}
 
-    {/* Sort */}
-    <div className="space-y-2">
-  <label
-    htmlFor="sort-filter"
-    className="text-sm font-medium"
-  >
-    Sort:
-  </label>
-
-  <Select
-    value={filters.sort}
-    onValueChange={(value) => {
-      handleSortChange({
-        target: {
-          value,
-        },
-      });
-    }}
-  >
-    <SelectTrigger
-      id="sort-filter"
-      className="w-full sm:w-[200px]"
-    >
-      <SelectValue placeholder="Sort applications" />
-    </SelectTrigger>
-
-    <SelectContent>
-      <SelectItem value="newest">
-        Newest
-      </SelectItem>
-
-      <SelectItem value="oldest">
-        Oldest
-      </SelectItem>
-
-      <SelectItem value="company">
-        Company
-      </SelectItem>
-    </SelectContent>
-  </Select>
-</div>
-
-    {/* Status Filter */}
-    <div className="space-y-2">
-  <label
-    htmlFor="status-filter"
-    className="text-sm font-medium"
-  >
-    Filter by Status:
-  </label>
-
-  <Select
-    value={filters.status || "ALL"}
-    onValueChange={(value) => {
-      handleStatusChange({
-        target: {
-          value: value === "ALL" ? "" : value,
-        },
-      });
-    }}
-  >
-    <SelectTrigger
-      id="status-filter"
-      className="w-full sm:w-[200px]"
-    >
-      <SelectValue placeholder="Filter by status" />
-    </SelectTrigger>
-
-    <SelectContent>
-      <SelectItem value="ALL">
-        All
-      </SelectItem>
-
-      <SelectItem value="APPLIED">
-        Applied
-      </SelectItem>
-
-      <SelectItem value="INTERVIEW">
-        Interview
-      </SelectItem>
-
-      <SelectItem value="OFFER">
-        Selected
-      </SelectItem>
-
-      <SelectItem value="REJECTED">
-        Rejected
-      </SelectItem>
-    </SelectContent>
-  </Select>
-</div>
-
-    {/* Applications */}
-    {applications.length === 0 ? (
-      <p>No applications found.</p>
-    ) : (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {applications.map((application) => (
-          <ApplicationCard
-            key={application.id}
-            application={application}
-          />
-        ))}
-      </div>
-    )}
-
-    {/* Pagination */}
-    {pagination.pages > 1 && (
       <div>
+        <h1 className="text-2xl font-bold">
+          Applications
+        </h1>
+
+        <p className="text-sm text-muted-foreground">
+          Manage, search and sort your job applications.
+        </p>
+      </div>
+
+      {/* Search and Filters */}
+
+      <div className="flex flex-col gap-4 md:flex-row md:items-end">
+
+        {/* Search */}
+
+        <div className="flex-1">
+          <label
+            htmlFor="search-filter"
+            className="mb-2 block text-sm font-medium"
+          >
+            Search
+          </label>
+
+          <input
+            id="search-filter"
+            type="text"
+            value={filters.search}
+            placeholder="Search company or role"
+            onChange={handleSearchChange}
+            className="w-full rounded-md border px-3 py-2"
+          />
+        </div>
+
+        {/* Sort */}
+
+        <div>
+          <label
+            htmlFor="sort-filter"
+            className="mb-2 block text-sm font-medium"
+          >
+            Sort
+          </label>
+
+          <Select
+            value={filters.sort}
+            onValueChange={handleSortChange}
+          >
+            <SelectTrigger
+              id="sort-filter"
+              className="w-full md:w-[200px]"
+            >
+              <SelectValue placeholder="Sort applications" />
+            </SelectTrigger>
+
+            <SelectContent>
+              <SelectItem value="newest">
+                Newest
+              </SelectItem>
+
+              <SelectItem value="oldest">
+                Oldest
+              </SelectItem>
+
+              <SelectItem value="company">
+                Company
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Status */}
+
+        <div>
+          <label
+            htmlFor="status-filter"
+            className="mb-2 block text-sm font-medium"
+          >
+            Status
+          </label>
+
+          <Select
+            value={filters.status || "ALL"}
+            onValueChange={handleStatusChange}
+          >
+            <SelectTrigger
+              id="status-filter"
+              className="w-full md:w-[200px]"
+            >
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+
+            <SelectContent>
+              <SelectItem value="ALL">
+                All
+              </SelectItem>
+
+              <SelectItem value="APPLIED">
+                Applied
+              </SelectItem>
+
+              <SelectItem value="INTERVIEW">
+                Interview
+              </SelectItem>
+
+              <SelectItem value="OFFER">
+                Selected
+              </SelectItem>
+
+              <SelectItem value="REJECTED">
+                Rejected
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* CSV Export */}
+
+        <div>
+          <label className="mb-2 block text-sm font-medium">
+            Export
+          </label>
+
+          <button
+            type="button"
+            onClick={() =>
+              exportApplicationsToCSV(applications)
+            }
+            disabled={applications.length === 0}
+            className="rounded-md border px-4 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+        </div>
+
+      </div>
+
+      {/* TanStack Table */}
+
+      {applications.length === 0 ? (
+        <p>
+          No applications found.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border">
+
+          <table className="w-full">
+
+            <thead className="bg-muted">
+
+              {table.getHeaderGroups().map(
+                (headerGroup) => (
+                  <tr key={headerGroup.id}>
+
+                    {/* Selection Header */}
+
+                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                      Select
+                    </th>
+
+                    {/* Table Headers */}
+
+                    {headerGroup.headers.map(
+                      (header) => (
+                        <th
+                          key={header.id}
+                          className="px-4 py-3 text-left text-sm font-semibold"
+                        >
+                          {header.isPlaceholder ? (
+                            null
+                          ) : (
+                            <button
+                              type="button"
+                              className="font-semibold"
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              <table.FlexRender
+                                header={header}
+                              />
+
+                              {{
+                                asc: " ↑",
+                                desc: " ↓",
+                              }[
+                                header.column.getIsSorted()
+                              ] || ""}
+                            </button>
+                          )}
+                        </th>
+                      )
+                    )}
+
+                  </tr>
+                )
+              )}
+
+            </thead>
+
+            <tbody>
+
+              {table
+                .getRowModel()
+                .rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-t"
+                  >
+
+                    {/* Row Selection */}
+
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={row.getIsSelected()}
+                        onChange={
+                          row.getToggleSelectedHandler()
+                        }
+                      />
+                    </td>
+
+                    {/* Row Data */}
+
+                    {row.getAllCells().map(
+                      (cell) => (
+                        <td
+                          key={cell.id}
+                          className="px-4 py-3 text-sm"
+                        >
+                          <table.FlexRender
+                            cell={cell}
+                          />
+                        </td>
+                      )
+                    )}
+
+                  </tr>
+                ))}
+
+            </tbody>
+
+          </table>
+
+        </div>
+      )}
+
+      {/* Pagination */}
+
+      <div className="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+
+        {/* Previous */}
+
         <button
           type="button"
           disabled={!pagination.has_prev}
           onClick={() =>
-            handlePageChange(pagination.page - 1)
+            handlePageChange(
+              pagination.page - 1
+            )
           }
+          className="rounded-md border px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Previous
         </button>
 
-        <span>
-          {" "}
-          Page {pagination.page} of {pagination.pages}{" "}
-        </span>
+        {/* Page Number */}
+
+        <div className="flex items-center justify-center gap-2 text-sm">
+
+          <span>
+            Page
+          </span>
+
+          <input
+            type="number"
+            min="1"
+            max={pagination.pages || 1}
+            value={pagination.page}
+            onChange={(event) =>
+              handlePageChange(
+                event.target.value
+              )
+            }
+            className="w-16 rounded-md border px-2 py-1 text-center"
+          />
+
+          <span>
+            of {pagination.pages || 1}
+          </span>
+
+        </div>
+
+        {/* Next */}
 
         <button
           type="button"
           disabled={!pagination.has_next}
           onClick={() =>
-            handlePageChange(pagination.page + 1)
+            handlePageChange(
+              pagination.page + 1
+            )
           }
+          className="rounded-md border px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Next
         </button>
+
       </div>
-    )}
-  </div>
-)};
+
+    </div>
+  );
+}
+
 export default Applications;
