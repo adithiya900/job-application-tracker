@@ -1,5 +1,8 @@
-import { useEffect } from "react";
+
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useDropzone } from "react-dropzone";
+import axios from "axios";
 
 import {
   createPaginatedRowModel,
@@ -14,6 +17,8 @@ import {
 import useApplicationStore, {
   selectFilteredApplications,
 } from "../stores/applicationStore";
+
+import api from "../services/api";
 
 import {
   Select,
@@ -31,34 +36,338 @@ const features = tableFeatures({
   paginatedRowModel: createPaginatedRowModel(),
 });
 
-const columns = [
-  {
-    accessorKey: "company",
-    header: "Company",
-  },
-  {
-    accessorKey: "role",
-    header: "Role",
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-  },
-  {
-    accessorKey: "applied_date",
-    header: "Applied Date",
-  },
-  {
-    accessorKey: "notes",
-    header: "Notes",
-  },
-];
+// --------------------------------------------------
+// File Size Formatter
+// --------------------------------------------------
+
+const formatFileSize = (bytes) => {
+  if (!bytes) {
+    return "0 Bytes";
+  }
+
+  const units = ["Bytes", "KB", "MB", "GB"];
+
+  const index = Math.floor(
+    Math.log(bytes) / Math.log(1024)
+  );
+
+  return `${(
+    bytes / Math.pow(1024, index)
+  ).toFixed(2)} ${units[index]}`;
+};
+
+// --------------------------------------------------
+// Resume Upload Cell
+// --------------------------------------------------
+
+function ResumeCell({ application }) {
+  const fetchApplications = useApplicationStore(
+    (state) => state.fetchApplications
+  );
+
+  const [resumeFile, setResumeFile] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [resumeExists, setResumeExists] = useState(
+    Boolean(application.resume_path)
+  );
+
+  // --------------------------------------------------
+  // Sync resume state with backend application data
+  // --------------------------------------------------
+
+  useEffect(() => {
+    const hasResume = Boolean(application.resume_path);
+
+    setResumeExists(hasResume);
+
+    if (!hasResume) {
+      setResumeFile(null);
+      setUploadProgress(0);
+    }
+  }, [application.resume_path]);
+
+  // --------------------------------------------------
+  // Upload Resume
+  // --------------------------------------------------
+
+  const uploadResume = async (file) => {
+    if (!file) {
+      return;
+    }
+
+    setError("");
+    setUploading(true);
+    setUploadProgress(0);
+
+    const formData = new FormData();
+    formData.append("resume", file);
+
+    try {
+      await api.post(
+        `/api/applications/${application.id}/resume`,
+        formData,
+        {
+          onUploadProgress: (progressEvent) => {
+            if (!progressEvent.total) {
+              return;
+            }
+
+            const progress = Math.round(
+              (progressEvent.loaded * 100) /
+                progressEvent.total
+            );
+
+            setUploadProgress(progress);
+          },
+        }
+      );
+
+      setResumeFile(file);
+      setResumeExists(true);
+      setUploadProgress(100);
+
+      // Refresh application data from backend
+      await fetchApplications();
+    } catch (uploadError) {
+      console.error(
+        "Resume upload failed:",
+        uploadError
+      );
+
+      if (
+        axios.isAxiosError(uploadError) &&
+        uploadError.response?.data?.error
+      ) {
+        setError(
+          uploadError.response.data.error
+        );
+      } else {
+        setError(
+          "Resume upload failed. Please try again."
+        );
+      }
+
+      setUploadProgress(0);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // --------------------------------------------------
+  // Dropzone
+  // --------------------------------------------------
+
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+  } = useDropzone({
+    accept: {
+      "application/pdf": [".pdf"],
+    },
+    multiple: false,
+    disabled: uploading,
+
+    onDropRejected: () => {
+      setError("Only PDF files are allowed.");
+    },
+
+    onDrop: (acceptedFiles) => {
+      setError("");
+
+      const file = acceptedFiles[0];
+
+      if (!file) {
+        return;
+      }
+
+      uploadResume(file);
+    },
+  });
+
+  // --------------------------------------------------
+  // Delete Resume
+  // --------------------------------------------------
+
+  const handleDeleteResume = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this resume?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+
+    try {
+      await api.delete(
+        `/api/applications/${application.id}/resume`
+      );
+
+      // Immediately clear local UI
+      setResumeFile(null);
+      setResumeExists(false);
+      setUploadProgress(0);
+
+      // Re-fetch applications from backend
+      // so the latest resume_path is loaded.
+      await fetchApplications();
+    } catch (deleteError) {
+      console.error(
+        "Resume delete failed:",
+        deleteError
+      );
+
+      if (
+        axios.isAxiosError(deleteError) &&
+        deleteError.response?.data?.error
+      ) {
+        setError(
+          deleteError.response.data.error
+        );
+      } else {
+        setError(
+          "Resume delete failed. Please try again."
+        );
+      }
+    }
+  };
+
+  // --------------------------------------------------
+  // Resume Display
+  // --------------------------------------------------
+
+  const displayedFilename =
+    resumeFile?.name ||
+    (application.resume_path
+      ? application.resume_path
+          .split(/[\\/]/)
+          .pop()
+      : "");
+
+  // --------------------------------------------------
+  // UI
+  // --------------------------------------------------
+
+  return (
+    <div className="min-w-[240px] space-y-3">
+
+      {/* Upload Area */}
+
+      {!resumeExists && !uploading && (
+        <div
+          {...getRootProps()}
+          className={`cursor-pointer rounded-md border-2 border-dashed p-4 text-center transition ${
+            isDragActive
+              ? "border-primary bg-muted"
+              : "border-muted-foreground/30 hover:border-primary"
+          }`}
+        >
+          <input {...getInputProps()} />
+
+          <p className="text-sm font-medium">
+            {isDragActive
+              ? "Drop PDF here"
+              : "Drag & drop PDF"}
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            or click to select
+          </p>
+        </div>
+      )}
+
+      {/* Upload Progress */}
+
+      {uploading && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">
+            Uploading resume...
+          </p>
+
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{
+                width: `${uploadProgress}%`,
+              }}
+            />
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {uploadProgress}%
+          </p>
+        </div>
+      )}
+
+      {/* Uploaded Resume */}
+
+      {resumeExists && !uploading && (
+        <div className="space-y-2">
+
+          <div className="rounded-md border p-3">
+            <p className="truncate text-sm font-medium">
+              {displayedFilename ||
+                "Resume uploaded"}
+            </p>
+
+            {resumeFile && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatFileSize(
+                  resumeFile.size
+                )}
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+
+            {/* Replace PDF */}
+
+            <div
+              {...getRootProps()}
+              className="flex-1 cursor-pointer rounded-md border px-3 py-2 text-center text-xs font-medium hover:bg-muted"
+            >
+              <input {...getInputProps()} />
+              Replace PDF
+            </div>
+
+            {/* Delete */}
+
+            <button
+              type="button"
+              onClick={handleDeleteResume}
+              className="rounded-md border px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10"
+            >
+              Delete
+            </button>
+
+          </div>
+        </div>
+      )}
+
+      {/* Error */}
+
+      {error && (
+        <p className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+
+    </div>
+  );
+}
 
 // --------------------------------------------------
 // CSV Export
 // --------------------------------------------------
 
-const exportApplicationsToCSV = (applications) => {
+const exportApplicationsToCSV = (
+  applications
+) => {
   const headers = [
     "Company",
     "Role",
@@ -67,13 +376,15 @@ const exportApplicationsToCSV = (applications) => {
     "Notes",
   ];
 
-  const rows = applications.map((application) => [
-    application.company,
-    application.role,
-    application.status,
-    application.applied_date,
-    application.notes,
-  ]);
+  const rows = applications.map(
+    (application) => [
+      application.company,
+      application.role,
+      application.status,
+      application.applied_date,
+      application.notes,
+    ]
+  );
 
   const csvContent = [
     headers,
@@ -84,7 +395,10 @@ const exportApplicationsToCSV = (applications) => {
         .map((value) => {
           const text = value ?? "";
 
-          return `"${String(text).replace(/"/g, '""')}"`;
+          return `"${String(text).replace(
+            /"/g,
+            '""'
+          )}"`;
         })
         .join(",")
     )
@@ -102,13 +416,58 @@ const exportApplicationsToCSV = (applications) => {
   link.download = "applications.csv";
 
   document.body.appendChild(link);
-
   link.click();
-
   document.body.removeChild(link);
 
   URL.revokeObjectURL(url);
 };
+
+// --------------------------------------------------
+// Table Columns
+// --------------------------------------------------
+
+const columns = [
+  {
+    accessorKey: "company",
+    header: "Company",
+  },
+
+  {
+    accessorKey: "role",
+    header: "Role",
+  },
+
+  {
+    accessorKey: "status",
+    header: "Status",
+  },
+
+  {
+    accessorKey: "applied_date",
+    header: "Applied Date",
+  },
+
+  {
+    accessorKey: "notes",
+    header: "Notes",
+  },
+
+  {
+    id: "resume",
+    header: "Resume",
+    enableSorting: false,
+
+    cell: ({ row }) => (
+      <ResumeCell
+        application={row.original}
+      />
+    ),
+  },
+];
+
+// --------------------------------------------------
+// Applications Page
+// --------------------------------------------------
 
 function Applications() {
   const [searchParams, setSearchParams] =
@@ -189,7 +548,7 @@ function Applications() {
   }, []);
 
   // --------------------------------------------------
-  // Fetch applications whenever filters/page change
+  // Fetch Applications
   // --------------------------------------------------
 
   useEffect(() => {
@@ -203,7 +562,7 @@ function Applications() {
   ]);
 
   // --------------------------------------------------
-  // Status filter
+  // Status Filter
   // --------------------------------------------------
 
   const handleStatusChange = (value) => {
@@ -216,7 +575,10 @@ function Applications() {
       new URLSearchParams(searchParams);
 
     if (status) {
-      nextParams.set("status", status);
+      nextParams.set(
+        "status",
+        status
+      );
     } else {
       nextParams.delete("status");
     }
@@ -227,11 +589,12 @@ function Applications() {
   };
 
   // --------------------------------------------------
-  // Search filter
+  // Search Filter
   // --------------------------------------------------
 
   const handleSearchChange = (event) => {
-    const search = event.target.value;
+    const search =
+      event.target.value;
 
     setSearchFilter(search);
 
@@ -239,7 +602,10 @@ function Applications() {
       new URLSearchParams(searchParams);
 
     if (search) {
-      nextParams.set("search", search);
+      nextParams.set(
+        "search",
+        search
+      );
     } else {
       nextParams.delete("search");
     }
@@ -259,8 +625,14 @@ function Applications() {
     const nextParams =
       new URLSearchParams(searchParams);
 
-    if (value && value !== "newest") {
-      nextParams.set("sort", value);
+    if (
+      value &&
+      value !== "newest"
+    ) {
+      nextParams.set(
+        "sort",
+        value
+      );
     } else {
       nextParams.delete("sort");
     }
@@ -282,7 +654,10 @@ function Applications() {
       Number(page) || 1;
 
     const nextPage = Math.min(
-      Math.max(requestedPage, 1),
+      Math.max(
+        requestedPage,
+        1
+      ),
       totalPages
     );
 
@@ -342,6 +717,7 @@ function Applications() {
     features,
     data: applications,
     columns,
+
     initialState: {
       pagination: {
         pageIndex: 0,
@@ -465,8 +841,12 @@ function Applications() {
           </label>
 
           <Select
-            value={filters.status || "ALL"}
-            onValueChange={handleStatusChange}
+            value={
+              filters.status || "ALL"
+            }
+            onValueChange={
+              handleStatusChange
+            }
           >
             <SelectTrigger
               id="status-filter"
@@ -509,9 +889,13 @@ function Applications() {
           <button
             type="button"
             onClick={() =>
-              exportApplicationsToCSV(applications)
+              exportApplicationsToCSV(
+                applications
+              )
             }
-            disabled={applications.length === 0}
+            disabled={
+              applications.length === 0
+            }
             className="rounded-md border px-4 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             Export CSV
@@ -533,51 +917,65 @@ function Applications() {
 
             <thead className="bg-muted">
 
-              {table.getHeaderGroups().map(
-                (headerGroup) => (
-                  <tr key={headerGroup.id}>
+              {table
+                .getHeaderGroups()
+                .map(
+                  (headerGroup) => (
+                    <tr
+                      key={
+                        headerGroup.id
+                      }
+                    >
 
-                    {/* Selection Header */}
+                      {/* Selection Header */}
 
-                    <th className="px-4 py-3 text-left text-sm font-semibold">
-                      Select
-                    </th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold">
+                        Select
+                      </th>
 
-                    {/* Table Headers */}
+                      {/* Table Headers */}
 
-                    {headerGroup.headers.map(
-                      (header) => (
-                        <th
-                          key={header.id}
-                          className="px-4 py-3 text-left text-sm font-semibold"
-                        >
-                          {header.isPlaceholder ? (
-                            null
-                          ) : (
-                            <button
-                              type="button"
-                              className="font-semibold"
-                              onClick={header.column.getToggleSortingHandler()}
-                            >
+                      {headerGroup.headers.map(
+                        (header) => (
+                          <th
+                            key={
+                              header.id
+                            }
+                            className="px-4 py-3 text-left text-sm font-semibold"
+                          >
+
+                            {header.isPlaceholder ? (
+                              null
+                            ) : header.column.getCanSort() ? (
+                              <button
+                                type="button"
+                                className="font-semibold"
+                                onClick={header.column.getToggleSortingHandler()}
+                              >
+                                <table.FlexRender
+                                  header={header}
+                                />
+
+                                {{
+                                  asc: " ↑",
+                                  desc: " ↓",
+                                }[
+                                  header.column.getIsSorted()
+                                ] || ""}
+                              </button>
+                            ) : (
                               <table.FlexRender
                                 header={header}
                               />
+                            )}
 
-                              {{
-                                asc: " ↑",
-                                desc: " ↓",
-                              }[
-                                header.column.getIsSorted()
-                              ] || ""}
-                            </button>
-                          )}
-                        </th>
-                      )
-                    )}
+                          </th>
+                        )
+                      )}
 
-                  </tr>
-                )
-              )}
+                    </tr>
+                  )
+                )}
 
             </thead>
 
@@ -585,41 +983,51 @@ function Applications() {
 
               {table
                 .getRowModel()
-                .rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-t"
-                  >
+                .rows.map(
+                  (row) => (
+                    <tr
+                      key={row.id}
+                      className="border-t"
+                    >
 
-                    {/* Row Selection */}
+                      {/* Row Selection */}
 
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={row.getIsSelected()}
-                        onChange={
-                          row.getToggleSelectedHandler()
-                        }
-                      />
-                    </td>
+                      <td className="px-4 py-3">
 
-                    {/* Row Data */}
+                        <input
+                          type="checkbox"
+                          checked={
+                            row.getIsSelected()
+                          }
+                          onChange={
+                            row.getToggleSelectedHandler()
+                          }
+                        />
 
-                    {row.getAllCells().map(
-                      (cell) => (
-                        <td
-                          key={cell.id}
-                          className="px-4 py-3 text-sm"
-                        >
-                          <table.FlexRender
-                            cell={cell}
-                          />
-                        </td>
-                      )
-                    )}
+                      </td>
 
-                  </tr>
-                ))}
+                      {/* Row Data */}
+
+                      {row
+                        .getAllCells()
+                        .map(
+                          (cell) => (
+                            <td
+                              key={
+                                cell.id
+                              }
+                              className="px-4 py-3 text-sm align-top"
+                            >
+                              <table.FlexRender
+                                cell={cell}
+                              />
+                            </td>
+                          )
+                        )}
+
+                    </tr>
+                  )
+                )}
 
             </tbody>
 
@@ -636,7 +1044,9 @@ function Applications() {
 
         <button
           type="button"
-          disabled={!pagination.has_prev}
+          disabled={
+            !pagination.has_prev
+          }
           onClick={() =>
             handlePageChange(
               pagination.page - 1
@@ -658,8 +1068,12 @@ function Applications() {
           <input
             type="number"
             min="1"
-            max={pagination.pages || 1}
-            value={pagination.page}
+            max={
+              pagination.pages || 1
+            }
+            value={
+              pagination.page
+            }
             onChange={(event) =>
               handlePageChange(
                 event.target.value
@@ -669,7 +1083,8 @@ function Applications() {
           />
 
           <span>
-            of {pagination.pages || 1}
+            of{" "}
+            {pagination.pages || 1}
           </span>
 
         </div>
@@ -678,7 +1093,9 @@ function Applications() {
 
         <button
           type="button"
-          disabled={!pagination.has_next}
+          disabled={
+            !pagination.has_next
+          }
           onClick={() =>
             handlePageChange(
               pagination.page + 1

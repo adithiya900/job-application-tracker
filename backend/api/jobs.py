@@ -765,6 +765,67 @@ def upload_resume(application_id):
             "error": str(e)
         }), 500
 
+    # ==========================================
+# Delete Resume
+# DELETE /applications/<id>/resume
+# ==========================================
+
+@jobs_bp.route(
+    "/applications/<int:application_id>/resume",
+    methods=["DELETE"]
+)
+@jobs_bp.route(
+    "/api/applications/<int:application_id>/resume",
+    methods=["DELETE"]
+)
+@jwt_required()
+def delete_resume(application_id):
+
+    try:
+
+        user_id = int(
+            get_jwt_identity()
+        )
+
+        application = (
+            ApplicationService.get_application_by_id(
+                application_id,
+                user_id
+            )
+        )
+
+        resume_path = application.resume_path
+
+        if not resume_path:
+            return jsonify({
+                "error": "No resume found"
+            }), 404
+
+        ApplicationService.set_resume_path(
+            application_id,
+            user_id,
+            None
+        )
+
+        if os.path.exists(resume_path):
+            os.remove(resume_path)
+
+        return jsonify({
+            "message": "Resume deleted successfully!"
+        }), 200
+
+    except ApplicationNotFound as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 404
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 500    
+
 
 @jobs_bp.route("/files/<path:filename>", methods=["GET"])
 @jwt_required()
