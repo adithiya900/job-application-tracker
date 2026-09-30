@@ -1,3 +1,4 @@
+
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ThemeToggle from "./ThemeToggle";
@@ -19,6 +20,7 @@ function Layout() {
           <Link to="/login">Login</Link>
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/applications">Applications</Link>
+          <Link to="/jobs">Job Search</Link>
 
           {isAuthenticated && (
             <button

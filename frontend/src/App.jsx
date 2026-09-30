@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 
@@ -10,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Applications from "./pages/Applications";
 import ComponentsDemo from "./pages/ComponentsDemo";
 import AddApplication from "./pages/AddApplication";
+import JobSearch from "./pages/JobSearch";
 
 import { ApplicationProvider } from "./contexts/ApplicationContext";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -30,6 +32,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Layout />}>
                 <Route index element={<Home />} />
+
                 <Route path="login" element={<Login />} />
 
                 <Route element={<PrivateRoute />}>
@@ -44,13 +47,18 @@ function App() {
                   />
 
                   <Route
-                    path="components-demo"
-                    element={<ComponentsDemo />}
+                    path="applications/add"
+                    element={<AddApplication />}
                   />
 
                   <Route
-                    path="applications/add"
-                    element={<AddApplication />}
+                    path="jobs"
+                    element={<JobSearch />}
+                  />
+
+                  <Route
+                    path="components-demo"
+                    element={<ComponentsDemo />}
                   />
                 </Route>
               </Route>
@@ -63,3 +71,4 @@ function App() {
 }
 
 export default App;
+
