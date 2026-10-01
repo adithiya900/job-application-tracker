@@ -1,7 +1,12 @@
 
+import toast from "react-hot-toast";
+
 import { useEffect, useState } from "react";
+
 import { useSearchParams } from "react-router-dom";
+
 import { useDropzone } from "react-dropzone";
+
 import axios from "axios";
 
 import {
@@ -14,9 +19,7 @@ import {
   useTable,
 } from "@tanstack/react-table";
 
-import useApplicationStore, {
-  selectFilteredApplications,
-} from "../stores/applicationStore";
+import useApplicationStore from "../stores/applicationStore";
 
 import api from "../services/api";
 
@@ -69,6 +72,7 @@ function ResumeCell({ application }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+
   const [resumeExists, setResumeExists] = useState(
     Boolean(application.resume_path)
   );
@@ -102,6 +106,7 @@ function ResumeCell({ application }) {
     setUploadProgress(0);
 
     const formData = new FormData();
+
     formData.append("resume", file);
 
     try {
@@ -128,6 +133,10 @@ function ResumeCell({ application }) {
       setResumeExists(true);
       setUploadProgress(100);
 
+      toast.success(
+        "Resume uploaded successfully!"
+      );
+
       // Refresh application data from backend
       await fetchApplications();
     } catch (uploadError) {
@@ -149,6 +158,10 @@ function ResumeCell({ application }) {
         );
       }
 
+      toast.error(
+        "Resume upload failed."
+      );
+
       setUploadProgress(0);
     } finally {
       setUploading(false);
@@ -167,11 +180,17 @@ function ResumeCell({ application }) {
     accept: {
       "application/pdf": [".pdf"],
     },
+
     multiple: false,
+
     disabled: uploading,
 
     onDropRejected: () => {
       setError("Only PDF files are allowed.");
+
+      toast.error(
+        "Only PDF files are allowed."
+      );
     },
 
     onDrop: (acceptedFiles) => {
@@ -212,6 +231,10 @@ function ResumeCell({ application }) {
       setResumeExists(false);
       setUploadProgress(0);
 
+      toast.success(
+        "Resume deleted successfully!"
+      );
+
       // Re-fetch applications from backend
       // so the latest resume_path is loaded.
       await fetchApplications();
@@ -233,6 +256,10 @@ function ResumeCell({ application }) {
           "Resume delete failed. Please try again."
         );
       }
+
+      toast.error(
+        "Resume delete failed."
+      );
     }
   };
 
@@ -440,6 +467,41 @@ const columns = [
   {
     accessorKey: "status",
     header: "Status",
+    enableSorting: false,
+    cell: ({ row }) => {
+      const application = row.original;
+
+      const updateStatus = useApplicationStore(
+        (state) => state.updateStatus
+      );
+
+      return (
+        <Select
+          value={application.status}
+          onValueChange={(value) =>
+            updateStatus(application.id, value)
+          }
+        >
+          <SelectTrigger className="w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="APPLIED">
+              Applied
+            </SelectItem>
+            <SelectItem value="INTERVIEW">
+              Interview
+            </SelectItem>
+            <SelectItem value="OFFER">
+              Selected
+            </SelectItem>
+            <SelectItem value="REJECTED">
+              Rejected
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      );
+    },
   },
 
   {
@@ -474,7 +536,7 @@ function Applications() {
     useSearchParams();
 
   const applications = useApplicationStore(
-    selectFilteredApplications
+    (state) => state.applications
   );
 
   const loading = useApplicationStore(
@@ -593,19 +655,14 @@ function Applications() {
   // --------------------------------------------------
 
   const handleSearchChange = (event) => {
-    const search =
-      event.target.value;
+    const search = event.target.value;
 
     setSearchFilter(search);
 
-    const nextParams =
-      new URLSearchParams(searchParams);
+    const nextParams = new URLSearchParams(searchParams);
 
     if (search) {
-      nextParams.set(
-        "search",
-        search
-      );
+      nextParams.set("search", search);
     } else {
       nextParams.delete("search");
     }
@@ -725,30 +782,6 @@ function Applications() {
       },
     },
   });
-
-  // --------------------------------------------------
-  // Loading
-  // --------------------------------------------------
-
-  if (loading) {
-    return (
-      <p>
-        Loading applications...
-      </p>
-    );
-  }
-
-  // --------------------------------------------------
-  // Error
-  // --------------------------------------------------
-
-  if (error) {
-    return (
-      <p>
-        {error}
-      </p>
-    );
-  }
 
   // --------------------------------------------------
   // UI
@@ -1113,3 +1146,4 @@ function Applications() {
 }
 
 export default Applications;
+

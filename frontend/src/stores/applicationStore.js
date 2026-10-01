@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
+import toast from "react-hot-toast";
 import api from "../services/api";
+import {
+  trackLocalStatusChange,
+} from "../services/notificationService";
 
 const useApplicationStore = create(
   devtools(
@@ -169,24 +173,44 @@ const useApplicationStore = create(
       },
 
       updateStatus: async (applicationId, status) => {
-        const response = await api.put(
-          `/applications/${applicationId}`,
-          { status }
-        );
+        try {
+          trackLocalStatusChange(applicationId, status);
 
-        const updatedApplication =
-          response.data.application;
+          const response = await api.put(
+            `/applications/${applicationId}`,
+            { status }
+          );
 
-        set((state) => ({
-          applications: state.applications.map(
-            (application) =>
-              application.id === applicationId
-                ? updatedApplication
-                : application
-          ),
-        }));
+          const updatedApplication =
+            response.data.application;
 
-        return updatedApplication;
+          set((state) => ({
+            applications: state.applications.map(
+              (application) =>
+                application.id === applicationId
+                  ? updatedApplication
+                  : application
+            ),
+          }));
+
+          toast.success(
+            "Application status updated successfully"
+          );
+
+          return updatedApplication;
+        } catch (error) {
+          console.error(
+            "Failed to update status:",
+            error
+          );
+
+          toast.error(
+            (error?.response?.data?.error ||
+              "Failed to update application status")
+          );
+
+          throw error;
+        }
       },
     }),
     {

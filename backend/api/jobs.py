@@ -25,6 +25,7 @@ from services.job_search_service import (
     MissingCredentialsError,
     ExternalAPIError
 )
+from services.notification_service import publish_notification
 
 
 # ==========================================
@@ -491,13 +492,19 @@ def update_application(application_id):
         user_id = int(
             get_jwt_identity()
         )
+        existing_application = ApplicationService.get_application_by_id(
+            application_id,
+            user_id
+        )
+
+        old_status = existing_application.status.value
 
         # ==========================================
         # Update application
         # ==========================================
-
+        
         application = ApplicationService.update_application(
-
+        
             application_id,
 
             data,
@@ -505,6 +512,23 @@ def update_application(application_id):
             user_id
 
         )
+        if (
+            data.get("status")
+            and old_status != application.status.value
+        ):
+            publish_notification(
+                user_id=user_id,
+                notification_type="APPLICATION_STATUS_CHANGED",
+                message=(
+                    f"Application status changed to "
+                    f"{application.status.value}"
+                ),
+                data={
+                    "application_id": application.id,
+                    "old_status": old_status,
+                    "new_status": application.status.value
+                }
+            )
 
         return jsonify({
 

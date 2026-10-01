@@ -1,10 +1,12 @@
 
 import { Link, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useNotifications } from "../contexts/NotificationContext";
 import ThemeToggle from "./ThemeToggle";
 
 function Layout() {
   const { isAuthenticated, logout } = useAuth();
+  const { unreadCount, markAllRead } = useNotifications();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -33,7 +35,26 @@ function Layout() {
           )}
         </div>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+          {isAuthenticated && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="relative rounded-md border px-3 py-1.5 text-sm"
+                title="Mark all notifications as read"
+              >
+                🔔
+
+                {unreadCount > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
           <ThemeToggle />
         </div>
       </nav>

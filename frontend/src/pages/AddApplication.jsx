@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import useApplicationStore from "../stores/applicationStore";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 
 const applicationSchema = z.object({
   company: z.string().min(2, "Company name is required"),
@@ -113,9 +113,9 @@ function AddApplication() {
 
       setCreatedApplication(created);
 
-      toast.success("Application added successfully", {
-        description: `${created.company} - ${created.role}`,
-      });
+      toast.success(
+        `Application added successfully: ${created.company} - ${created.role}`
+      );
     } catch (error) {
       console.error(
         "Failed to create application:",
@@ -126,10 +126,9 @@ function AddApplication() {
         "Failed to create application. Please try again."
       );
 
-      toast.error("Failed to add application", {
-        description:
-          "Please check the form and try again.",
-      });
+      toast.error(
+        "Failed to add application"
+      );
     } finally {
       setSubmitting(false);
     }

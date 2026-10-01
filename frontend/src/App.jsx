@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 
 import { Toaster } from "@/components/ui/sonner";
+import { Toaster as HotToaster } from "react-hot-toast";
 
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
@@ -14,6 +15,7 @@ import AddApplication from "./pages/AddApplication";
 import JobSearch from "./pages/JobSearch";
 
 import { ApplicationProvider } from "./contexts/ApplicationContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import PrivateRoute from "./routes/PrivateRoute";
 
@@ -25,9 +27,11 @@ function App() {
       enableSystem
     >
       <Toaster />
+      <HotToaster position="top-right" />
 
       <BrowserRouter>
         <AuthProvider>
+          <NotificationProvider>
           <ApplicationProvider>
             <Routes>
               <Route path="/" element={<Layout />}>
@@ -64,6 +68,7 @@ function App() {
               </Route>
             </Routes>
           </ApplicationProvider>
+          </NotificationProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
