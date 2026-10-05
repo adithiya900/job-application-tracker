@@ -15,7 +15,7 @@ class WebhookService:
     @staticmethod
     def send_status_change(application, old_status, new_status):
         webhook_url = os.getenv("WEBHOOK_URL")
-        webhook_secret = os.getenv("WEBHOOK_SECRET")
+        webhook_secret = os.getenv("WEBHOOK_SECRET") or ""
 
         if not webhook_url:
             logger.warning("WEBHOOK_URL is not configured")

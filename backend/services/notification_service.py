@@ -40,12 +40,16 @@ def publish_notification(
         "data": data or {}
     }
 
-    client = get_redis_client()
+    try:
+        client = get_redis_client()
 
-    client.publish(
-        NOTIFICATION_CHANNEL,
-        json.dumps(event)
-    )
+        client.publish(
+            NOTIFICATION_CHANNEL,
+            json.dumps(event)
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Redis notification publish failed: %s", e)
 
 
 def subscribe_to_notifications():

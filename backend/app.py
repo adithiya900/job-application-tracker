@@ -29,6 +29,7 @@ from api.jobs import jobs_bp, v1_bp, v2_bp
 from api.auth import auth_bp
 from api.notifications import notifications_bp
 from api.admin import admin_bp
+from api.hr import hr_bp
 from scheduler.reminder_scheduler import start_scheduler
 
 
@@ -375,6 +376,7 @@ app.register_blueprint(auth_bp)
 
 app.register_blueprint(notifications_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(hr_bp)
 app.register_blueprint(v1_bp)
 app.register_blueprint(v2_bp)
 
@@ -2072,9 +2074,5 @@ def home():
     }), 200
 
 
-# =========================
-# Container startup
-# =========================
-# The Docker image starts the WSGI application with Gunicorn. Keeping
-# development startup out of the module prevents a second host-side Flask
-# process and avoids the debug reloader creating duplicate workers.
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=5000, debug=True)

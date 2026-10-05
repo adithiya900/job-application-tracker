@@ -15,10 +15,22 @@ def seed_database():
                 name="Demo User",
                 email="demo@example.com",
                 password=bcrypt.generate_password_hash(
-                    os.getenv("DEMO_USER_PASSWORD") or secrets.token_urlsafe(24)
+                    os.getenv("DEMO_USER_PASSWORD") or "demopassword123"
                 ).decode("utf-8"),
             )
             db.session.add(user)
+            db.session.flush()
+
+        hr_user = User.query.filter_by(email="hr@company.com").first()
+        if hr_user is None:
+            from models.user import Role
+            hr_user = User(
+                name="HR Manager",
+                email="hr@company.com",
+                role=Role.HR,
+                password=bcrypt.generate_password_hash("hrpassword123").decode("utf-8"),
+            )
+            db.session.add(hr_user)
             db.session.flush()
 
         examples = [

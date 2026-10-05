@@ -4,7 +4,7 @@ import logging
 import os
 
 from extensions import db, cache
-from models.job import JobApplication, ApplicationStatus
+from models.job import JobApplication, ApplicationStatus, ApplicationStatusHistory
 from models.user import User
 
 from exceptions.application_exceptions import (
@@ -73,6 +73,17 @@ class ApplicationService:
 
         db.session.add(new_application)
         try:
+            db.session.flush()  # Get new_application.id before commit
+
+            # Record initial status history
+            initial_history = ApplicationStatusHistory(
+                application_id=new_application.id,
+                old_status=None,
+                new_status=new_application.status,
+                changed_by=user_id,
+                notes="Application submitted",
+            )
+            db.session.add(initial_history)
             db.session.commit()
         except Exception:
             db.session.rollback()
@@ -438,50 +449,20 @@ class ApplicationService:
 
         total_applications = len(applications)
 
-        applied = sum(
-            1
-            for application in applications
-            if application.status == ApplicationStatus.APPLIED
-        )
-
-        phone_screen = sum(
-            1
-            for application in applications
-            if application.status == ApplicationStatus.PHONE_SCREEN
-        )
-
-        interview = sum(
-            1
-            for application in applications
-            if application.status == ApplicationStatus.INTERVIEW
-        )
-
-        rejected = sum(
-            1
-            for application in applications
-            if application.status == ApplicationStatus.REJECTED
-        )
-
-        offered = sum(
-            1
-            for application in applications
-            if application.status == ApplicationStatus.OFFER
-        )
+        by_status = {status.value: 0 for status in ApplicationStatus}
+        for application in applications:
+            by_status[application.status.value] += 1
 
         return {
             "total_applications": total_applications,
-            "applied": applied,
-            "phone_screen": phone_screen,
-            "interview": interview,
-            "rejected": rejected,
-            "offered": offered,
-            "by_status": {
-                "APPLIED": applied,
-                "PHONE_SCREEN": phone_screen,
-                "INTERVIEW": interview,
-                "OFFER": offered,
-                "REJECTED": rejected
-            }
+            "applied": by_status.get("APPLIED", 0),
+            "under_review": by_status.get("UNDER_REVIEW", 0),
+            "phone_screen": by_status.get("PHONE_SCREEN", 0),
+            "interview": by_status.get("INTERVIEW", 0),
+            "rejected": by_status.get("REJECTED", 0),
+            "offered": by_status.get("OFFER", 0),
+            "withdrawn": by_status.get("WITHDRAWN", 0),
+            "by_status": by_status,
         }
     # =========================
     # Analytics

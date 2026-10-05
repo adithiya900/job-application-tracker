@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 function Login() {
@@ -8,9 +8,11 @@ function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
 
     try {
       await login(email, password);
@@ -18,14 +20,16 @@ function Login() {
       console.log("Login successful");
 
       navigate("/applications");
-    } catch (error) {
-      console.error("Login failed:", error);
+    } catch (err) {
+      setError(err.response?.data?.error || "Login failed");
     }
   };
 
   return (
     <div>
       <h1>Login Page</h1>
+
+      {error && <div style={{ color: "red" }}>{error}</div>}
 
       <form onSubmit={handleLogin}>
         <div>
@@ -48,6 +52,10 @@ function Login() {
 
         <button type="submit">Login</button>
       </form>
+
+      <p>
+        Don't have an account? <Link to="/register">Register</Link>
+      </p>
     </div>
   );
 }

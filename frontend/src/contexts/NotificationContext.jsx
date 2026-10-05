@@ -5,6 +5,7 @@ import {
   isLocalStatusChange,
 } from "../services/notificationService";
 import { useAuth } from "./AuthContext";
+import useApplicationStore from "../stores/applicationStore";
 
 const NotificationContext = createContext(null);
 
@@ -47,6 +48,13 @@ export function NotificationProvider({ children }) {
 
       const appId = notification.data?.application_id;
       const newStatus = notification.data?.new_status;
+
+      // Automatically refresh applications list in real-time
+      try {
+        useApplicationStore.getState().fetchApplications();
+      } catch (err) {
+        console.error("Failed to auto-refresh applications:", err);
+      }
 
       if (appId && newStatus && isLocalStatusChange(appId, newStatus)) {
         return;

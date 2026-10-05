@@ -29,3 +29,29 @@ def admin_required(fn):
         return fn(*args, **kwargs)
 
     return wrapper
+
+
+def hr_required(fn):
+    """Decorator that allows both HR and ADMIN roles."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+
+        verify_jwt_in_request()
+
+        user_id = int(get_jwt_identity())
+
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({
+                "error": "User not found"
+            }), 404
+
+        if user.role not in (Role.HR, Role.ADMIN):
+            return jsonify({
+                "error": "HR access required"
+            }), 403
+
+        return fn(*args, **kwargs)
+
+    return wrapper

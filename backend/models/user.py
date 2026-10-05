@@ -4,6 +4,7 @@ import enum
 
 class Role(enum.Enum):
     USER = "USER"
+    HR = "HR"
     ADMIN = "ADMIN"
 
 
@@ -37,6 +38,19 @@ class User(db.Model):
         db.Enum(Role),
         nullable=False,
         default=Role.USER
+    )
+
+    # User timezone (IANA timezone string, e.g., 'Asia/Kolkata', 'UTC')
+    timezone = db.Column(
+        db.String(50),
+        nullable=False,
+        default='UTC'
+    )
+
+    # Slack webhook URL for notifications
+    webhook_url = db.Column(
+        db.String(500),
+        nullable=True
     )
 
     # One user can have many job applications

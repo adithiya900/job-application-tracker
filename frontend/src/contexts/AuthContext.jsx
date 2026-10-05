@@ -35,6 +35,28 @@ export const AuthProvider = ({ children }) => {
     return loggedInUser;
   };
 
+  const register = async (name, email, password) => {
+    const response = await api.post("/register", {
+      name,
+      email,
+      password,
+    });
+
+    const {
+      access_token,
+      refresh_token,
+      user: registeredUser,
+    } = response.data;
+
+    localStorage.setItem("access_token", access_token);
+    localStorage.setItem("refresh_token", refresh_token);
+    localStorage.setItem("user", JSON.stringify(registeredUser));
+
+    setUser(registeredUser);
+
+    return registeredUser;
+  };
+
   const logout = async () => {
     try {
       const accessToken = localStorage.getItem("access_token");
@@ -53,6 +75,41 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const getProfile = async () => {
+    const response = await api.get("/profile");
+    const { user: profileUser } = response.data;
+    localStorage.setItem("user", JSON.stringify(profileUser));
+    setUser(profileUser);
+    return profileUser;
+  };
+
+  const updateProfile = async (data) => {
+    const response = await api.put("/profile", data);
+    const { user: updatedUser } = response.data;
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+    setUser(updatedUser);
+    return updatedUser;
+  };
+
+  const changePassword = async (currentPassword, newPassword) => {
+    const response = await api.put("/password", {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    return response.data;
+  };
+
+  const deleteAccount = async (password) => {
+    const response = await api.delete("/account", {
+      data: { password },
+    });
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
+    setUser(null);
+    return response.data;
+  };
+
   const isAuthenticated = !!user;
 
   return (
@@ -60,7 +117,12 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         login,
+        register,
         logout,
+        getProfile,
+        updateProfile,
+        changePassword,
+        deleteAccount,
         isAuthenticated,
       }}
     >

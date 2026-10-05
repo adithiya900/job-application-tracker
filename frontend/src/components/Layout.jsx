@@ -5,7 +5,7 @@ import { useNotifications } from "../contexts/NotificationContext";
 import ThemeToggle from "./ThemeToggle";
 
 function Layout() {
-  const { isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { unreadCount, markAllRead } = useNotifications();
   const navigate = useNavigate();
 
@@ -14,15 +14,27 @@ function Layout() {
     navigate("/login");
   };
 
+  const isHR = user?.role === "HR" || user?.role === "ADMIN";
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <nav className="flex items-center gap-4 border-b px-4 py-3">
         <div className="flex flex-wrap items-center gap-4">
-          <Link to="/">Home</Link>
-          <Link to="/login">Login</Link>
-          <Link to="/dashboard">Dashboard</Link>
-          <Link to="/applications">Applications</Link>
-          <Link to="/jobs">Job Search</Link>
+          <Link to="/" className="font-semibold text-primary">JobTracker</Link>
+          {!isAuthenticated && <Link to="/login">Login</Link>}
+          {isAuthenticated && (
+            <>
+              <Link to="/dashboard">Dashboard</Link>
+              <Link to="/applications">My Applications</Link>
+              <Link to="/jobs">Job Search</Link>
+              <Link to="/settings">Settings</Link>
+              {isHR && (
+                <Link to="/hr" className="font-semibold text-purple-600 dark:text-purple-400">
+                  HR Portal
+                </Link>
+              )}
+            </>
+          )}
 
           {isAuthenticated && (
             <button

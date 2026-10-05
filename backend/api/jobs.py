@@ -9,13 +9,18 @@ from marshmallow import ValidationError
 from PyPDF2 import PdfReader
 import os
 
-from extensions import cache
+from extensions import db, cache
 from services.application_service import ApplicationService
 from exceptions.application_exceptions import (
     ApplicationNotFound,
     DuplicateApplication
 )
-from models.job import ApplicationStatus
+from models.job import (
+    ApplicationStatus,
+    ApplicationStatusHistory,
+    STATUS_TRANSITIONS,
+)
+from models.user import User
 from schemas.application_schema import (
     CreateApplicationSchema,
     UpdateApplicationSchema
@@ -26,6 +31,7 @@ from services.job_search_service import (
     ExternalAPIError
 )
 from services.notification_service import publish_notification
+from services.email_service import send_email
 
 
 # ==========================================
@@ -55,9 +61,8 @@ update_application_schema = UpdateApplicationSchema()
 # Helper Function
 # ==========================================
 
-def serialize_application(application):
-
-    return {
+def serialize_application(application, include_history=False):
+    data = {
         "id": application.id,
         "company": application.company,
         "role": application.role,
@@ -67,6 +72,11 @@ def serialize_application(application):
             if application.applied_date
             else None
         ),
+        "updated_at": (
+            application.updated_at.isoformat()
+            if application.updated_at
+            else None
+        ),
         "interview_at": (
             application.interview_at.isoformat()
             if application.interview_at
@@ -74,8 +84,20 @@ def serialize_application(application):
         ),
         "notes": application.notes,
         "user_id": application.user_id,
-        "resume_path": application.resume_path
+        "resume_path": application.resume_path,
     }
+
+    if include_history:
+        data["status_history"] = [
+            h.to_dict() for h in application.status_history
+        ]
+        # Include interview details visible to candidate (no HR notes)
+        if application.interview_details:
+            data["interview_details"] = application.interview_details.to_dict(include_hr_notes=False)
+        else:
+            data["interview_details"] = None
+
+    return data
 
 
 # ==========================================
@@ -427,7 +449,7 @@ def get_application(application_id):
         )
 
         return jsonify(
-            serialize_application(application)
+            serialize_application(application, include_history=True)
         ), 200
 
     except ApplicationNotFound as e:
@@ -1220,7 +1242,117 @@ def export_import_errors():
     )
     return response, 200
 
-    # ==========================================
+# ==========================================
+# Withdraw Application
+# POST /api/applications/<id>/withdraw
+# ==========================================
+
+@jobs_bp.route(
+    "/applications/<int:application_id>/withdraw",
+    methods=["POST"]
+)
+@jobs_bp.route(
+    "/api/applications/<int:application_id>/withdraw",
+    methods=["POST"]
+)
+@jwt_required()
+def withdraw_application(application_id):
+    try:
+        user_id = int(get_jwt_identity())
+
+        application = ApplicationService.get_application_by_id(
+            application_id,
+            user_id
+        )
+
+        if application.status == ApplicationStatus.WITHDRAWN:
+            return jsonify({"error": "Application is already withdrawn"}), 400
+
+        # Cannot withdraw terminal states
+        if application.status == ApplicationStatus.REJECTED:
+            return jsonify({"error": "Cannot withdraw a rejected application"}), 400
+
+        old_status = application.status
+        application.status = ApplicationStatus.WITHDRAWN
+
+        # Record history
+        history = ApplicationStatusHistory(
+            application_id=application.id,
+            old_status=old_status,
+            new_status=ApplicationStatus.WITHDRAWN,
+            changed_by=user_id,
+            notes="Withdrawn by candidate",
+        )
+        db.session.add(history)
+        db.session.commit()
+
+        cache.delete(f"analytics:user:{user_id}")
+
+        # Notify via Redis/SSE
+        publish_notification(
+            user_id=user_id,
+            notification_type="APPLICATION_WITHDRAWN",
+            message=(
+                f"Your application for {application.role} at {application.company} "
+                f"has been withdrawn."
+            ),
+            data={
+                "application_id": application.id,
+                "old_status": old_status.value,
+                "new_status": "WITHDRAWN",
+            }
+        )
+
+        return jsonify({
+            "message": "Application withdrawn successfully",
+            "application": serialize_application(application),
+        }), 200
+
+    except ApplicationNotFound as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+# ==========================================
+# Get Application Status History
+# GET /api/applications/<id>/history
+# ==========================================
+
+@jobs_bp.route(
+    "/applications/<int:application_id>/history",
+    methods=["GET"]
+)
+@jobs_bp.route(
+    "/api/applications/<int:application_id>/history",
+    methods=["GET"]
+)
+@jwt_required()
+def get_application_history(application_id):
+    try:
+        user_id = int(get_jwt_identity())
+
+        application = ApplicationService.get_application_by_id(
+            application_id,
+            user_id
+        )
+
+        return jsonify({
+            "application_id": application.id,
+            "current_status": application.status.value,
+            "status_history": [
+                h.to_dict() for h in application.status_history
+            ],
+        }), 200
+
+    except ApplicationNotFound as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==========================================
 # Temporary Admin Test Route
 # ==========================================
 

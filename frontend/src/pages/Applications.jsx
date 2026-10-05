@@ -30,6 +30,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const STATUS_BADGES = {
+  APPLIED: { label: "Applied", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
+  UNDER_REVIEW: { label: "Under Review", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
+  PHONE_SCREEN: { label: "Phone Screen", color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200" },
+  INTERVIEW: { label: "Interview", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
+  OFFER: { label: "Offer", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" },
+  REJECTED: { label: "Rejected", color: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200" },
+  WITHDRAWN: { label: "Withdrawn", color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300" },
+};
 
 const features = tableFeatures({
   rowSortingFeature,
@@ -470,36 +487,17 @@ const columns = [
     enableSorting: false,
     cell: ({ row }) => {
       const application = row.original;
-
-      const updateStatus = useApplicationStore(
-        (state) => state.updateStatus
-      );
+      const badge = STATUS_BADGES[application.status] || {
+        label: application.status,
+        color: "bg-gray-100 text-gray-800",
+      };
 
       return (
-        <Select
-          value={application.status}
-          onValueChange={(value) =>
-            updateStatus(application.id, value)
-          }
+        <span
+          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${badge.color}`}
         >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="APPLIED">
-              Applied
-            </SelectItem>
-            <SelectItem value="INTERVIEW">
-              Interview
-            </SelectItem>
-            <SelectItem value="OFFER">
-              Selected
-            </SelectItem>
-            <SelectItem value="REJECTED">
-              Rejected
-            </SelectItem>
-          </SelectContent>
-        </Select>
+          {badge.label}
+        </span>
       );
     },
   },
@@ -523,6 +521,27 @@ const columns = [
       <ResumeCell
         application={row.original}
       />
+    ),
+  },
+
+  {
+    id: "actions",
+    header: "Action",
+    enableSorting: false,
+    cell: ({ row }) => (
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          window.dispatchEvent(
+            new CustomEvent("open-candidate-app-detail", {
+              detail: row.original,
+            })
+          );
+        }}
+      >
+        View Details
+      </Button>
     ),
   },
 ];
@@ -574,6 +593,40 @@ function Applications() {
   const setPage = useApplicationStore(
     (state) => state.setPage
   );
+
+  const [selectedApp, setSelectedApp] = useState(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    const handler = async (e) => {
+      const appItem = e.detail;
+      setDetailModalOpen(true);
+      setLoadingDetail(true);
+      try {
+        const res = await api.get(`/api/applications/${appItem.id}`);
+        setSelectedApp(res.data);
+      } catch (err) {
+        setSelectedApp(appItem);
+      } finally {
+        setLoadingDetail(false);
+      }
+    };
+
+    window.addEventListener("open-candidate-app-detail", handler);
+    return () => window.removeEventListener("open-candidate-app-detail", handler);
+  }, []);
+
+  const handleWithdraw = async (appId) => {
+    try {
+      await api.put(`/api/applications/${appId}`, { status: "WITHDRAWN" });
+      toast.success("Application withdrawn successfully");
+      setDetailModalOpen(false);
+      fetchApplications();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to withdraw application");
+    }
+  };
 
   // --------------------------------------------------
   // Read filters and page from URL
@@ -890,11 +943,19 @@ function Applications() {
 
             <SelectContent>
               <SelectItem value="ALL">
-                All
+                All Statuses
               </SelectItem>
 
               <SelectItem value="APPLIED">
                 Applied
+              </SelectItem>
+
+              <SelectItem value="UNDER_REVIEW">
+                Under Review
+              </SelectItem>
+
+              <SelectItem value="PHONE_SCREEN">
+                Phone Screen
               </SelectItem>
 
               <SelectItem value="INTERVIEW">
@@ -902,11 +963,15 @@ function Applications() {
               </SelectItem>
 
               <SelectItem value="OFFER">
-                Selected
+                Offer
               </SelectItem>
 
               <SelectItem value="REJECTED">
                 Rejected
+              </SelectItem>
+
+              <SelectItem value="WITHDRAWN">
+                Withdrawn
               </SelectItem>
             </SelectContent>
           </Select>
@@ -1140,6 +1205,185 @@ function Applications() {
         </button>
 
       </div>
+
+      {/* Candidate Application Details & Timeline Modal */}
+      <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedApp?.role} at {selectedApp?.company}
+            </DialogTitle>
+          </DialogHeader>
+
+          {loadingDetail ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              Loading application details & timeline...
+            </div>
+          ) : selectedApp ? (
+            <div className="space-y-6 text-sm">
+              {/* Header Info */}
+              <div className="grid grid-cols-2 gap-4 bg-muted/40 p-4 rounded-lg">
+                <div>
+                  <span className="text-xs font-semibold uppercase text-muted-foreground">Applied Date</span>
+                  <div className="font-medium text-base">
+                    {selectedApp.applied_date
+                      ? new Date(selectedApp.applied_date).toLocaleDateString()
+                      : "N/A"}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-xs font-semibold uppercase text-muted-foreground">Current Status</span>
+                  <div>
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold mt-1 ${(STATUS_BADGES[selectedApp.status] || {}).color || "bg-gray-100 text-gray-800"}`}
+                    >
+                      {(STATUS_BADGES[selectedApp.status] || {}).label || selectedApp.status}
+                    </span>
+                  </div>
+                </div>
+                {selectedApp.notes && (
+                  <div className="col-span-2">
+                    <span className="text-xs font-semibold uppercase text-muted-foreground">Notes</span>
+                    <p className="mt-0.5 text-muted-foreground">{selectedApp.notes}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Interview Information Card */}
+              {selectedApp.interview_details && (
+                <div className="border border-amber-300 bg-amber-50/70 dark:bg-amber-950/30 p-4 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-amber-900 dark:text-amber-200">
+                      Scheduled Interview
+                    </h4>
+                    <span className="text-xs bg-amber-200/70 dark:bg-amber-900 px-2 py-0.5 rounded font-medium">
+                      {selectedApp.interview_details.interview_type || "Online"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs pt-1">
+                    <div>
+                      <span className="font-medium text-muted-foreground">Round:</span>{" "}
+                      <span className="font-semibold">{selectedApp.interview_details.interview_round}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-muted-foreground">Interviewer:</span>{" "}
+                      <span>{selectedApp.interview_details.interviewer || "TBD"}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-muted-foreground">Date:</span>{" "}
+                      <span>{selectedApp.interview_details.interview_date}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-muted-foreground">Time:</span>{" "}
+                      <span>{selectedApp.interview_details.interview_time}</span>
+                    </div>
+                    {selectedApp.interview_details.meeting_link && (
+                      <div className="col-span-2 mt-1">
+                        <span className="font-medium text-muted-foreground">Join Meeting:</span>{" "}
+                        <a
+                          href={selectedApp.interview_details.meeting_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
+                        >
+                          {selectedApp.interview_details.meeting_link}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Visual Journey Steps */}
+              <div>
+                <h4 className="font-semibold text-sm mb-3">Application Journey</h4>
+                <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                  {["APPLIED", "UNDER_REVIEW", "INTERVIEW", selectedApp.status === "REJECTED" ? "REJECTED" : selectedApp.status === "WITHDRAWN" ? "WITHDRAWN" : "OFFER"].map(
+                    (step, idx) => {
+                      const isCurrent = selectedApp.status === step;
+                      const isPassed =
+                        (step === "APPLIED") ||
+                        (step === "UNDER_REVIEW" && ["UNDER_REVIEW", "PHONE_SCREEN", "INTERVIEW", "OFFER", "REJECTED", "WITHDRAWN"].includes(selectedApp.status)) ||
+                        (step === "INTERVIEW" && ["INTERVIEW", "OFFER"].includes(selectedApp.status)) ||
+                        (isCurrent);
+
+                      return (
+                        <div
+                          key={step}
+                          className={`p-2.5 rounded-lg border flex flex-col items-center ${
+                            isCurrent
+                              ? "border-primary bg-primary/10 font-bold"
+                              : isPassed
+                              ? "border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300"
+                              : "border-muted bg-muted/20 text-muted-foreground"
+                          }`}
+                        >
+                          <span className="text-base mb-1">
+                            {isCurrent ? "●" : isPassed ? "✓" : "○"}
+                          </span>
+                          <span>{(STATUS_BADGES[step] || {}).label || step}</span>
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+
+              {/* Status History Timeline */}
+              <div>
+                <h4 className="font-semibold text-sm mb-3">Status Timeline</h4>
+                {selectedApp.status_history && selectedApp.status_history.length > 0 ? (
+                  <div className="relative border-l border-muted pl-6 space-y-4">
+                    {selectedApp.status_history.map((hist, idx) => (
+                      <div key={hist.id || idx} className="relative">
+                        <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-primary" />
+                        <div className="font-medium text-sm">
+                          {hist.old_status
+                            ? `${(STATUS_BADGES[hist.old_status] || {}).label || hist.old_status} ➔ ${(STATUS_BADGES[hist.new_status] || {}).label || hist.new_status}`
+                            : `Application Submitted (${(STATUS_BADGES[hist.new_status] || {}).label || hist.new_status})`}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {new Date(hist.changed_at).toLocaleString()}
+                        </div>
+                        {hist.notes && (
+                          <div className="text-xs bg-muted/40 p-2 rounded mt-1 italic text-muted-foreground">
+                            {hist.notes}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No timeline history recorded yet.</p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center pt-2 border-t">
+                {selectedApp.status !== "WITHDRAWN" && selectedApp.status !== "REJECTED" && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleWithdraw(selectedApp.id)}
+                  >
+                    Withdraw Application
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => setDetailModalOpen(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
