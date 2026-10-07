@@ -13,7 +13,7 @@ class UserFactory(factory.alchemy.SQLAlchemyModelFactory):
     email = factory.Sequence(
         lambda n: f"testuser{n}@example.com"
     )
-    password = "testpassword123"
+    password = "factory-test-password"
 
 
 class ApplicationFactory(factory.alchemy.SQLAlchemyModelFactory):

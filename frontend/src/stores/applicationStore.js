@@ -36,6 +36,7 @@ const useApplicationStore = create(
             useApplicationStore.getState();
 
           const response = await api.get("/applications", {
+            skipErrorHandler: true,
             params: {
               status: filters.status || undefined,
               search: filters.search || undefined,
@@ -144,7 +145,8 @@ const useApplicationStore = create(
         try {
           const response = await api.post(
             "/applications",
-            applicationData
+            applicationData,
+            { skipErrorHandler: true }
           );
 
           const createdApplication =
@@ -178,7 +180,8 @@ const useApplicationStore = create(
 
           const response = await api.put(
             `/applications/${applicationId}`,
-            { status }
+            { status },
+            { skipErrorHandler: true }
           );
 
           const updatedApplication =

@@ -35,6 +35,12 @@ services:
       DATABASE_URL: postgresql://job_tracker:${POSTGRES_PASSWORD}@postgres:5432/job_tracker
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env before starting Docker Compose}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL:-user@gmail.com}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-user123}
+      DEMO_HR_EMAIL: ${DEMO_HR_EMAIL:-hr@gmail.com}
+      DEMO_HR_PASSWORD: ${DEMO_HR_PASSWORD:-hr123}
+      DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-admin@gmail.com}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-admin123}
       ADZUNA_APP_ID: ${ADZUNA_APP_ID:-}
       ADZUNA_APP_KEY: ${ADZUNA_APP_KEY:-}
       ADZUNA_COUNTRY: ${ADZUNA_COUNTRY:-in}

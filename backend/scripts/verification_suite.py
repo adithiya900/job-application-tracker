@@ -20,6 +20,13 @@ from models.job import JobApplication, ApplicationStatus, ApplicationStatusHisto
 from seed import seed_database
 
 def run_verification():
+    os.environ.setdefault("DEMO_USER_EMAIL", "user@gmail.com")
+    os.environ.setdefault("DEMO_USER_PASSWORD", "user123")
+    os.environ.setdefault("DEMO_HR_EMAIL", "hr@gmail.com")
+    os.environ.setdefault("DEMO_HR_PASSWORD", "hr123")
+    os.environ.setdefault("DEMO_ADMIN_EMAIL", "admin@gmail.com")
+    os.environ.setdefault("DEMO_ADMIN_PASSWORD", "admin123")
+
     print("=" * 70)
     print("STARTING E2E VERIFICATION OF JOB APPLICATION TRACKER")
     print("=" * 70)
@@ -46,7 +53,7 @@ def run_verification():
         client = app.test_client()
 
         # Step 2: HR Login Verification
-        hr_login = client.post("/login", json={"email": "hr@company.com", "password": "hrpassword123"})
+        hr_login = client.post("/login", json={"email": "hr@gmail.com", "password": "hr123"})
         assert hr_login.status_code == 200, f"HR login failed: {hr_login.data}"
         hr_token = hr_login.json["access_token"]
         hr_headers = {"Authorization": f"Bearer {hr_token}"}
@@ -54,16 +61,16 @@ def run_verification():
         print("[PASS] Step 2 & 3: HR Login successful with HR role.")
 
         # Step 3: Create Candidate Accounts
-        cand1_res = client.post("/register", json={"name": "Alice Candidate", "email": "alice@test.com", "password": "password123"})
+        cand1_res = client.post("/register", json={"name": "Alice Candidate", "email": "alice@test.com", "password": "candidate-test-password"})
         assert cand1_res.status_code in (201, 409)
         
-        cand1_login = client.post("/login", json={"email": "alice@test.com", "password": "password123"})
+        cand1_login = client.post("/login", json={"email": "alice@test.com", "password": "candidate-test-password"})
         cand1_token = cand1_login.json["access_token"]
         cand1_headers = {"Authorization": f"Bearer {cand1_token}"}
 
-        cand2_res = client.post("/register", json={"name": "Bob Candidate", "email": "bob@test.com", "password": "password123"})
+        cand2_res = client.post("/register", json={"name": "Bob Candidate", "email": "bob@test.com", "password": "candidate-test-password"})
         assert cand2_res.status_code in (201, 409)
-        cand2_login = client.post("/login", json={"email": "bob@test.com", "password": "password123"})
+        cand2_login = client.post("/login", json={"email": "bob@test.com", "password": "candidate-test-password"})
         cand2_token = cand2_login.json["access_token"]
         cand2_headers = {"Authorization": f"Bearer {cand2_token}"}
         print("[PASS] Step 5: Candidate accounts created and authenticated.")

@@ -4,7 +4,7 @@ def test_register_and_login_uses_postgres(integration_client):
         json={
             "name": "Integration Auth User",
             "email": "integration-auth@example.com",
-            "password": "password123",
+            "password": "example-password-123",
         },
     )
 
@@ -14,14 +14,14 @@ def test_register_and_login_uses_postgres(integration_client):
     register_data = register_response.get_json()
 
     assert register_data["message"] == "User registered successfully!"
-    assert register_data["email"] == "integration-auth@example.com"
-    assert register_data["name"] == "Integration Auth User"
+    assert register_data["user"]["email"] == "integration-auth@example.com"
+    assert register_data["user"]["name"] == "Integration Auth User"
 
     login_response = integration_client.post(
         "/login",
         json={
             "email": "integration-auth@example.com",
-            "password": "password123",
+            "password": "example-password-123",
         },
     )
 

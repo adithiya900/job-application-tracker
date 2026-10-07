@@ -61,9 +61,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const accessToken = localStorage.getItem("access_token");
 
-      if (accessToken) {
-        await api.post("/logout");
-      }
+        if (accessToken) {
+          await api.post("/logout", {}, { skipErrorHandler: true });
+        }
     } catch (error) {
       console.error("Logout API failed:", error);
     } finally {
@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateProfile = async (data) => {
-    const response = await api.put("/profile", data);
+    const response = await api.put("/profile", data, { skipErrorHandler: true });
     const { user: updatedUser } = response.data;
     localStorage.setItem("user", JSON.stringify(updatedUser));
     setUser(updatedUser);
@@ -95,13 +95,14 @@ export const AuthProvider = ({ children }) => {
     const response = await api.put("/password", {
       current_password: currentPassword,
       new_password: newPassword,
-    });
+    }, { skipErrorHandler: true });
     return response.data;
   };
 
   const deleteAccount = async (password) => {
     const response = await api.delete("/account", {
       data: { password },
+      skipErrorHandler: true,
     });
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");

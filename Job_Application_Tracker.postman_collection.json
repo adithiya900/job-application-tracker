@@ -56,7 +56,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Adithiya\",\n    \"email\": \"adithiya@example.com\",\n    \"password\": \"password123\"\n}"
+							"raw": "{\n    \"name\": \"Adithiya\",\n    \"email\": \"adithiya@example.com\",\n    \"password\": \"example-password-123\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/register",
@@ -110,7 +110,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"adithiya@example.com\",\n    \"password\": \"password123\"\n}"
+							"raw": "{\n    \"email\": \"adithiya@example.com\",\n    \"password\": \"example-password-123\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/login",

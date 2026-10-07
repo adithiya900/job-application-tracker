@@ -124,6 +124,10 @@ def login():
         return jsonify({
             "error": "Invalid email or password"
         }), 401
+    if not user.is_active:
+        return jsonify({
+            "error": "This account has been disabled. Contact an administrator."
+        }), 403
 
     # =========================
     # Create Access + Refresh Tokens

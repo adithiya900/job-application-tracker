@@ -30,7 +30,10 @@ from services.job_search_service import (
     MissingCredentialsError,
     ExternalAPIError
 )
-from services.notification_service import publish_notification
+from services.notification_service import (
+    publish_admin_notification,
+    publish_notification,
+)
 from services.email_service import send_email
 
 
@@ -150,6 +153,16 @@ def create_application():
         application = ApplicationService.create_application(
             data,
             user_id
+        )
+        candidate = db.session.get(User, user_id)
+        publish_admin_notification(
+            "APPLICATION_CREATED",
+            f"{candidate.name if candidate else 'A candidate'} applied for {application.role} at {application.company}.",
+            {
+                "application_id": application.id,
+                "candidate_id": user_id,
+                "new_status": application.status.value,
+            },
         )
 
         return jsonify({
@@ -550,6 +563,16 @@ def update_application(application_id):
                     "old_status": old_status,
                     "new_status": application.status.value
                 }
+            )
+            publish_admin_notification(
+                "APPLICATION_STATUS_CHANGED",
+                f"{application.user.name} changed {application.role} at {application.company} to {application.status.value}.",
+                {
+                    "application_id": application.id,
+                    "candidate_id": user_id,
+                    "old_status": old_status,
+                    "new_status": application.status.value,
+                },
             )
 
         return jsonify({
@@ -1301,6 +1324,16 @@ def withdraw_application(application_id):
                 "old_status": old_status.value,
                 "new_status": "WITHDRAWN",
             }
+        )
+        publish_admin_notification(
+            "APPLICATION_WITHDRAWN",
+            f"{application.user.name} withdrew {application.role} at {application.company}.",
+            {
+                "application_id": application.id,
+                "candidate_id": user_id,
+                "old_status": old_status.value,
+                "new_status": "WITHDRAWN",
+            },
         )
 
         return jsonify({

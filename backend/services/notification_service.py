@@ -52,6 +52,19 @@ def publish_notification(
         logging.getLogger(__name__).warning("Redis notification publish failed: %s", e)
 
 
+def publish_admin_notification(notification_type, message, data=None):
+    """Publish a management event to every current admin account."""
+    from models.user import Role, User
+
+    for admin in User.query.filter_by(role=Role.ADMIN).all():
+        publish_notification(
+            user_id=admin.id,
+            notification_type=notification_type,
+            message=message,
+            data=data,
+        )
+
+
 def subscribe_to_notifications():
     """
     Subscribe to the application notification channel.

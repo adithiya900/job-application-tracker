@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from flask_jwt_extended import decode_token
 
 from extensions import db
 from models.job import ApplicationStatus, JobApplication
@@ -127,9 +128,37 @@ def test_resume_text_returns_extracted_skills(client, auth_headers, test_user):
     file_path.unlink(missing_ok=True)
 
 
-def test_seed_database_creates_exactly_three_idempotently(test_app):
+def test_seed_database_creates_demo_logins_and_three_applications(
+    test_app, client, monkeypatch
+):
+    for key in (
+        "DEMO_USER_EMAIL",
+        "DEMO_USER_PASSWORD",
+        "DEMO_HR_EMAIL",
+        "DEMO_HR_PASSWORD",
+        "DEMO_ADMIN_EMAIL",
+        "DEMO_ADMIN_PASSWORD",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("DEMO_USER_PASSWORD", "user123")
+    monkeypatch.setenv("DEMO_HR_PASSWORD", "hr123")
+    monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "admin123")
+
     assert seed_database() == 3
     assert JobApplication.query.count() == 3
+    for email, password, role in (
+        ("user@gmail.com", "user123", "USER"),
+        ("hr@gmail.com", "hr123", "HR"),
+        ("admin@gmail.com", "admin123", "ADMIN"),
+    ):
+        response = client.post(
+            "/login",
+            json={"email": email, "password": password},
+        )
+        assert response.status_code == 200
+        assert response.get_json()["user"]["role"] == role
+        assert decode_token(response.get_json()["access_token"])["role"] == role
+
     assert seed_database() == 0
     assert JobApplication.query.count() == 3
 

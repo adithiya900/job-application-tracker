@@ -28,13 +28,17 @@ from models.job import (
     STATUS_TRANSITIONS,
 )
 from models.user import User
+from models.audit_log import AuditLog
 from utils.admin import hr_required
 from schemas.application_schema import (
     HRStatusUpdateSchema,
     HRInterviewSchema,
     HRFeedbackSchema,
 )
-from services.notification_service import publish_notification
+from services.notification_service import (
+    publish_admin_notification,
+    publish_notification,
+)
 from services.email_service import send_email
 
 hr_bp = Blueprint("hr", __name__, url_prefix="/api/hr")
@@ -178,6 +182,14 @@ def hr_list_applications():
                 db.or_(
                     JobApplication.company.ilike(search_term),
                     JobApplication.role.ilike(search_term),
+                    JobApplication.user_id.in_(
+                        db.session.query(User.id).filter(
+                            db.or_(
+                                User.name.ilike(search_term),
+                                User.email.ilike(search_term),
+                            )
+                        )
+                    ),
                 )
             )
 
@@ -315,6 +327,18 @@ def hr_update_status(application_id):
             changed_by_id=hr_user_id,
             notes=notes,
         )
+        db.session.add(AuditLog(
+            admin_id=hr_user_id,
+            action="application_status_updated",
+            target_user_id=application.user_id,
+            details={
+                "application_id": application.id,
+                "company": application.company,
+                "role": application.role,
+                "old_status": old_status.value,
+                "new_status": new_status.value,
+            },
+        ))
 
         db.session.commit()
 
@@ -323,6 +347,16 @@ def hr_update_status(application_id):
 
         # Notify candidate via Redis/SSE + email
         send_status_notification(application, old_status, new_status)
+        publish_admin_notification(
+            "APPLICATION_STATUS_CHANGED",
+            f"{application.role} at {application.company} moved to {new_status.value}.",
+            {
+                "application_id": application.id,
+                "candidate_id": application.user_id,
+                "old_status": old_status.value,
+                "new_status": new_status.value,
+            },
+        )
 
         return jsonify({
             "message": f"Status updated to {new_status.value}",
@@ -432,6 +466,25 @@ def hr_update_interview(application_id):
                     )
                 )
 
+        db.session.add(AuditLog(
+            admin_id=hr_user_id,
+            action="interview_scheduled",
+            target_user_id=application.user_id,
+            details={
+                "application_id": application.id,
+                "company": application.company,
+                "role": application.role,
+                "interview_date": interview.interview_date.isoformat() if interview.interview_date else None,
+                "interview_round": interview.interview_round,
+            },
+        ))
+        db.session.commit()
+        publish_admin_notification(
+            "INTERVIEW_SCHEDULED",
+            f"Interview scheduled for {application.role} at {application.company}.",
+            {"application_id": application.id, "candidate_id": application.user_id},
+        )
+
         return jsonify({
             "message": "Interview details updated",
             "interview": interview.to_dict(include_hr_notes=True),
@@ -477,7 +530,23 @@ def hr_add_feedback(application_id):
             internal_notes=validated.get("internal_notes"),
         )
         db.session.add(feedback)
+        db.session.add(AuditLog(
+            admin_id=hr_user_id,
+            action="interview_feedback_submitted",
+            target_user_id=application.user_id,
+            details={
+                "application_id": application.id,
+                "company": application.company,
+                "role": application.role,
+                "recommendation": validated.get("recommendation"),
+            },
+        ))
         db.session.commit()
+        publish_admin_notification(
+            "INTERVIEW_FEEDBACK_SUBMITTED",
+            f"Interview feedback submitted for {application.role} at {application.company}.",
+            {"application_id": application.id, "candidate_id": application.user_id},
+        )
 
         return jsonify({
             "message": "Feedback submitted",

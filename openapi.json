@@ -854,7 +854,7 @@
                     "type": "string"
                   },
                   "password": {
-                    "example": "password123",
+                    "example": "example-password-123",
                     "type": "string"
                   }
                 },
@@ -945,7 +945,7 @@
                     "type": "string"
                   },
                   "password": {
-                    "example": "password123",
+                    "example": "example-password-123",
                     "type": "string"
                   }
                 },

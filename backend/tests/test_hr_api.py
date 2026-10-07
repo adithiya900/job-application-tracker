@@ -13,9 +13,9 @@ from models.job import JobApplication, ApplicationStatus, ApplicationStatusHisto
 def hr_user(test_app):
     user = User(
         name="HR Recruiter",
-        email="hr@company.com",
+        email="hr@gmail.com",
         role=Role.HR,
-        password=bcrypt.generate_password_hash("hrpassword123").decode("utf-8")
+        password=bcrypt.generate_password_hash("hr123").decode("utf-8")
     )
     db.session.add(user)
     db.session.commit()
@@ -26,7 +26,7 @@ def hr_user(test_app):
 def hr_token(client, hr_user):
     res = client.post("/login", json={
         "email": hr_user.email,
-        "password": "hrpassword123"
+        "password": "hr123"
     })
     assert res.status_code == 200
     return res.json["access_token"]
@@ -67,6 +67,17 @@ def test_candidate_hr_full_workflow(client, auth_headers, test_user, hr_headers,
     target = next((a for a in apps if a["id"] == app_id), None)
     assert target is not None
     assert target["candidate"]["email"] == test_user.email
+
+    candidate_search_res = client.get(
+        "/api/hr/applications",
+        query_string={"search": test_user.email},
+        headers=hr_headers,
+    )
+    assert candidate_search_res.status_code == 200
+    assert any(
+        app["id"] == app_id
+        for app in candidate_search_res.json["applications"]
+    )
 
     # 3. HR updates status to UNDER_REVIEW
     status_res = client.patch(

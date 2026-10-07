@@ -53,7 +53,7 @@ def client(test_app):
 def test_user(test_app):
 
     hashed_password = bcrypt.generate_password_hash(
-        "testpassword123"
+        "test-credential-123"
     ).decode("utf-8")
 
     user = User(
@@ -94,7 +94,7 @@ def test_register_user_success(client):
     data = {
         "name": "Adithiya",
         "email": "adithiya@example.com",
-        "password": "password123"
+        "password": "example-password-123"
     }
 
     response = client.post(
@@ -131,7 +131,7 @@ def test_register_duplicate_email(
     data = {
         "name": "Another User",
         "email": "testuser@example.com",
-        "password": "password123"
+        "password": "example-password-123"
     }
 
     response = client.post(
@@ -204,7 +204,7 @@ def test_login_success(
 
     data = {
         "email": "testuser@example.com",
-        "password": "testpassword123"
+        "password": "test-credential-123"
     }
 
     response = client.post(
@@ -267,7 +267,7 @@ def test_login_user_not_found(client):
 
     data = {
         "email": "unknown@example.com",
-        "password": "password123"
+        "password": "invalid-example-password"
     }
 
     response = client.post(
@@ -473,8 +473,8 @@ def test_change_password_success(
 ):
 
     data = {
-        "current_password": "testpassword123",
-        "new_password": "newpassword123"
+        "current_password": "test-credential-123",
+        "new_password": "updated-test-credential-123"
     }
 
     response = client.put(
@@ -502,7 +502,7 @@ def test_change_password_wrong_current(
 
     data = {
         "current_password": "wrongpassword",
-        "new_password": "newpassword123"
+        "new_password": "updated-test-credential-123"
     }
 
     response = client.put(
@@ -528,7 +528,7 @@ def test_change_password_missing_fields(
 ):
 
     data = {
-        "current_password": "testpassword123"
+        "current_password": "test-credential-123"
     }
 
     response = client.put(
@@ -566,7 +566,7 @@ def test_delete_account_success(
 ):
 
     data = {
-        "password": "testpassword123"
+        "password": "test-credential-123"
     }
 
     response = client.delete(

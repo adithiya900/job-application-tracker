@@ -1,316 +1,241 @@
-
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import useApplicationStore from "../stores/applicationStore";
 import toast from "react-hot-toast";
 
-const applicationSchema = z.object({
+const schema = z.object({
   company: z.string().min(2, "Company name is required"),
   role: z.string().min(2, "Role is required"),
-  status: z.enum(["Applied", "Interview", "Selected", "Rejected"], {
-    error: "Please select a valid status",
-  }),
   date: z.string().min(1, "Date is required"),
-  notes: z.string().min(1, "Notes are required"),
+  notes: z.string().optional(),
 });
 
-function AddApplication() {
+export default function AddApplication() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const addApplication = useApplicationStore((s) => s.addApplication);
 
-  const [formNote, setFormNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [createdApplication, setCreatedApplication] = useState(null);
+  const [success, setSuccess] = useState(null);
 
-  const applications = useApplicationStore(
-    (state) => state.applications
-  );
-
-  const addApplication = useApplicationStore(
-    (state) => state.addApplication
-  );
-
-  const pendingApplication = applications.find(
-    (application) => application.optimistic
-  );
-
-  // Job Search-la irundhu vandha job details
   const trackedJob = location.state?.job;
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(applicationSchema),
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({
+    resolver: zodResolver(schema),
     defaultValues: {
       company: "",
       role: "",
-      status: "Applied",
       date: new Date().toISOString().split("T")[0],
       notes: "",
     },
   });
 
-  const watchedNotes = watch("notes");
-
-  // =========================
-  // Pre-fill form from Job Search
-  // =========================
   useEffect(() => {
-    if (!trackedJob) {
-      return;
-    }
-
-    const jobNotes = [
+    if (!trackedJob) return;
+    const notes = [
       "Tracked from Job Search",
-      trackedJob.salary
-        ? `Salary: ${trackedJob.salary}`
-        : "",
-      trackedJob.link
-        ? `Job Link: ${trackedJob.link}`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
+      trackedJob.salary ? `Salary: ${trackedJob.salary}` : "",
+      trackedJob.link ? `Job Link: ${trackedJob.link}` : "",
+    ].filter(Boolean).join("\n");
 
     reset({
       company: trackedJob.company || "",
       role: trackedJob.role || "",
-      status: "Applied",
       date: new Date().toISOString().split("T")[0],
-      notes: jobNotes || "Tracked from Job Search",
+      notes,
     });
-
-    setFormNote(jobNotes || "Tracked from Job Search");
   }, [trackedJob, reset]);
 
   const onSubmit = async (data) => {
     try {
       setSubmitting(true);
       setSubmitError("");
-      setCreatedApplication(null);
-
-      const statusMap = {
-        Applied: "APPLIED",
-        Interview: "INTERVIEW",
-        Selected: "OFFER",
-        Rejected: "REJECTED",
-      };
+      setSuccess(null);
 
       const created = await addApplication({
         company: data.company,
         role: data.role,
-        status: statusMap[data.status],
-        notes: data.notes,
+        status: "APPLIED",
+        notes: data.notes || "",
         applied_date: data.date,
       });
 
-      setCreatedApplication(created);
+      setSuccess(created);
+      toast.success(`✅ Application added: ${created.company} — ${created.role}`);
 
-      toast.success(
-        `Application added successfully: ${created.company} - ${created.role}`
-      );
-    } catch (error) {
-      console.error(
-        "Failed to create application:",
-        error
-      );
-
-      setSubmitError(
-        "Failed to create application. Please try again."
-      );
-
-      toast.error(
-        "Failed to add application"
-      );
+      setTimeout(() => navigate("/applications"), 1500);
+    } catch (err) {
+      setSubmitError(err.response?.data?.error || "Failed to create application. Please try again.");
+      toast.error("Failed to add application");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const notesValue = watch("notes") || "";
+
   return (
-    <div>
-      <h1>Add Application</h1>
-
-      {trackedJob && (
-        <div className="mb-4 rounded-md border p-4">
-          <p className="text-sm font-medium">
-            Job tracked from Job Search
-          </p>
-
-          <p className="text-sm text-muted-foreground">
-            {trackedJob.company} - {trackedJob.role}
-          </p>
-        </div>
-      )}
-
-      {submitError && (
-        <p className="form-error">
-          {submitError}
+    <div style={{ maxWidth: "640px" }}>
+      {/* Header */}
+      <div style={{ marginBottom: "28px" }}>
+        <h1 style={{ fontSize: "26px", fontWeight: 800, color: "#fff", marginBottom: "6px" }}>
+          Add Application
+        </h1>
+        <p style={{ color: "#777", fontSize: "14px" }}>
+          Track a new job application in your pipeline.
         </p>
-      )}
+      </div>
 
-      {(pendingApplication || createdApplication) && (
-        <div>
-          <h3>
-            {(pendingApplication || createdApplication).company}
-          </h3>
-
-          <p>
-            {(pendingApplication || createdApplication).role}
-          </p>
-
-          <p>
-            {(pendingApplication || createdApplication).status}
-          </p>
-
-          {pendingApplication && (
-            <p>Saving...</p>
-          )}
+      {/* Job tracked banner */}
+      {trackedJob && (
+        <div style={{
+          background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.2)",
+          borderRadius: "10px", padding: "14px 16px", marginBottom: "20px",
+          display: "flex", gap: "12px", alignItems: "center"
+        }}>
+          <span style={{ fontSize: "20px" }}>🔍</span>
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: "#FFD700" }}>Job tracked from Job Search</div>
+            <div style={{ fontSize: "12px", color: "#B8B8B8", marginTop: "2px" }}>
+              {trackedJob.company} — {trackedJob.role}
+            </div>
+          </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        {/* Company */}
-        <div>
-          <label htmlFor="company">
-            Company
-          </label>
-
-          <input
-            id="company"
-            type="text"
-            {...register("company")}
-          />
-
-          {errors.company && (
-            <p className="form-error">
-              {errors.company.message}
-            </p>
-          )}
+      {/* Success */}
+      {success && (
+        <div style={{
+          background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)",
+          borderRadius: "10px", padding: "14px 16px", marginBottom: "20px",
+          display: "flex", gap: "10px", alignItems: "center", color: "#22c55e"
+        }}>
+          <span style={{ fontSize: "20px" }}>🎉</span>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: "13px" }}>Application added successfully!</div>
+            <div style={{ fontSize: "12px", marginTop: "2px" }}>{success.company} — {success.role} · Redirecting...</div>
+          </div>
         </div>
+      )}
 
-        {/* Role */}
-        <div>
-          <label htmlFor="role">
-            Role
-          </label>
-
-          <input
-            id="role"
-            type="text"
-            {...register("role")}
-          />
-
-          {errors.role && (
-            <p className="form-error">
-              {errors.role.message}
-            </p>
-          )}
+      {/* Error */}
+      {submitError && (
+        <div style={{
+          background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
+          borderRadius: "10px", padding: "12px 14px", color: "#ef4444",
+          fontSize: "13px", marginBottom: "20px",
+          display: "flex", alignItems: "center", gap: "8px"
+        }}>
+          <span>⚠</span> {submitError}
         </div>
+      )}
 
-        {/* Status */}
-        <div>
-          <label htmlFor="status">
-            Status
-          </label>
+      {/* Form Card */}
+      <div style={{
+        background: "#111111", border: "1px solid #1F1F1F",
+        borderRadius: "16px", padding: "32px 28px"
+      }}>
+        <form onSubmit={handleSubmit(onSubmit)} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* Company */}
+          <div>
+            <label className="label-gold">Company Name *</label>
+            <input
+              className={`input-gold ${errors.company ? "border-red-500" : ""}`}
+              placeholder="e.g. Google, Microsoft"
+              {...register("company")}
+            />
+            {errors.company && (
+              <p style={{ fontSize: "12px", color: "#ef4444", marginTop: "4px" }}>{errors.company.message}</p>
+            )}
+          </div>
 
-          <select
-            id="status"
-            {...register("status")}
-          >
-            <option value="">
-              Select Status
-            </option>
+          {/* Role */}
+          <div>
+            <label className="label-gold">Job Role *</label>
+            <input
+              className={`input-gold ${errors.role ? "border-red-500" : ""}`}
+              placeholder="e.g. Software Engineer, Product Manager"
+              {...register("role")}
+            />
+            {errors.role && (
+              <p style={{ fontSize: "12px", color: "#ef4444", marginTop: "4px" }}>{errors.role.message}</p>
+            )}
+          </div>
 
-            <option value="Applied">
-              Applied
-            </option>
+          {/* Status info */}
+          <div style={{
+            background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.15)",
+            borderRadius: "8px", padding: "12px 14px",
+            display: "flex", gap: "10px", alignItems: "center"
+          }}>
+            <span>📝</span>
+            <span style={{ fontSize: "12px", color: "#D4AF37" }}>
+              New applications are created with <strong>APPLIED</strong> status.
+            </span>
+          </div>
 
-            <option value="Interview">
-              Interview
-            </option>
+          {/* Date */}
+          <div>
+            <label className="label-gold">Application Date *</label>
+            <input
+              type="date"
+              className={`input-gold ${errors.date ? "border-red-500" : ""}`}
+              {...register("date")}
+            />
+            {errors.date && (
+              <p style={{ fontSize: "12px", color: "#ef4444", marginTop: "4px" }}>{errors.date.message}</p>
+            )}
+          </div>
 
-            <option value="Selected">
-              Selected
-            </option>
+          {/* Notes */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <label className="label-gold" style={{ margin: 0 }}>Notes</label>
+              <span style={{ fontSize: "11px", color: "#555" }}>{notesValue.length} chars</span>
+            </div>
+            <textarea
+              className="input-gold"
+              placeholder="Recruiter contact, salary info, source link, etc."
+              rows={4}
+              style={{ resize: "vertical" }}
+              {...register("notes")}
+            />
+          </div>
 
-            <option value="Rejected">
-              Rejected
-            </option>
-          </select>
-
-          {errors.status && (
-            <p className="form-error">
-              {errors.status.message}
-            </p>
-          )}
-        </div>
-
-        {/* Date */}
-        <div>
-          <label htmlFor="date">
-            Date
-          </label>
-
-          <input
-            id="date"
-            type="date"
-            {...register("date")}
-          />
-
-          {errors.date && (
-            <p className="form-error">
-              {errors.date.message}
-            </p>
-          )}
-        </div>
-
-        {/* Notes */}
-        <div>
-          <label htmlFor="notes">
-            Notes
-          </label>
-
-          <textarea
-            id="notes"
-            rows="4"
-            {...register("notes")}
-            onChange={(event) =>
-              setFormNote(event.target.value)
-            }
-          />
-
-          <p>
-            Characters:{" "}
-            {watchedNotes?.length || formNote.length}
-          </p>
-
-          {errors.notes && (
-            <p className="form-error">
-              {errors.notes.message}
-            </p>
-          )}
-        </div>
-
-        <button
-          type="submit"
-          disabled={submitting}
-        >
-          {submitting
-            ? "Adding..."
-            : "Add Application"}
-        </button>
-      </form>
+          {/* Actions */}
+          <div style={{ display: "flex", gap: "12px", paddingTop: "8px" }}>
+            <button
+              type="submit"
+              className="btn-gold"
+              disabled={submitting}
+              style={{ flex: 1, justifyContent: "center", padding: "13px" }}
+            >
+              {submitting ? (
+                <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{
+                    width: 16, height: 16, border: "2px solid rgba(5,5,5,0.3)",
+                    borderTop: "2px solid #050505", borderRadius: "50%",
+                    animation: "spin 0.8s linear infinite", display: "inline-block"
+                  }} />
+                  Submitting...
+                </span>
+              ) : "Submit Application"}
+            </button>
+            <button
+              type="button"
+              className="btn-outline-gold"
+              onClick={() => navigate("/applications")}
+              style={{ padding: "13px 20px" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
-
-export default AddApplication;
-

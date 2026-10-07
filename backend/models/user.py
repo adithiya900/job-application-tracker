@@ -1,4 +1,5 @@
 from extensions import db
+from datetime import datetime
 import enum
 
 
@@ -38,6 +39,18 @@ class User(db.Model):
         db.Enum(Role),
         nullable=False,
         default=Role.USER
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    is_active = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=True
     )
 
     # User timezone (IANA timezone string, e.g., 'Asia/Kolkata', 'UTC')

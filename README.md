@@ -61,6 +61,28 @@ docker compose up -d
 docker compose exec flask flask db upgrade
 ```
 
+### Create local demo accounts
+
+After the migrations, seed the demo logins and sample applications:
+
+```bash
+docker compose exec flask python seed.py
+```
+
+The local Compose defaults are:
+
+| Role | Email | Password |
+|---|---|---|
+| Candidate | `user@gmail.com` | `user123` |
+| HR | `hr@gmail.com` | `hr123` |
+| Admin | `admin@gmail.com` | `admin123` |
+
+Seeding creates these accounts if they do not exist and resets their names,
+roles, and passwords to the configured demo values each time it runs. It
+preserves their existing application data. These simple credentials are for
+local demos only. Override all six `DEMO_*` values in `.env` before seeding a
+non-local environment.
+
 ### Service URLs
 
 | Service | URL |
@@ -71,6 +93,25 @@ docker compose exec flask flask db upgrade
 | Flower (Celery) | http://localhost:5555 |
 
 ---
+
+## Admin Portal
+
+After signing in with an `ADMIN` account, the frontend opens `/admin`. The
+Admin Portal provides system-wide account and application analytics, searchable
+user management (create, edit, role assignment, enable/disable, and delete),
+application editing and candidate reassignment, status/history management,
+interview scheduling, private feedback review, and an audited activity log.
+Application reassignment is restricted to active candidate accounts, rejects
+duplicate applications for the same company and role, preserves status history,
+and notifies both candidates. Admin-only JSON APIs are under
+`/api/admin/*`; HR interview and feedback workflows remain under
+`/api/hr/*` and continue to enforce HR-or-Admin authorization.
+
+Account deletion cascades to that account's applications. The last active
+administrator cannot be disabled, demoted, or deleted. Disabled accounts are
+blocked from login and existing JWT access. The Job Search navigation opens
+the existing external job-search integration; this project does not persist
+job listings and therefore has no separate admin CRUD for job listings.
 
 ## Docker Architecture
 
@@ -147,4 +188,5 @@ docker compose exec flask python -m pytest tests/ -v
 - No secrets are hardcoded in `Dockerfile` or `docker-compose.yml`
 - All secrets are supplied via environment variables
 - Docker Compose uses `${VAR:-default}` syntax with safe defaults only for development
+- Demo-account credentials are development-only defaults; override them before seeding outside a local demo
 - Rotate credentials if they were ever committed or exposed

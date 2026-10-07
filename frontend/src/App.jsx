@@ -15,13 +15,17 @@ import ComponentsDemo from "./pages/ComponentsDemo";
 import AddApplication from "./pages/AddApplication";
 import JobSearch from "./pages/JobSearch";
 import HRDashboard from "./pages/HRDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import Settings from "./pages/Settings";
+import NotFound from "./pages/NotFound";
+
 
 import { ApplicationProvider } from "./contexts/ApplicationContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import PrivateRoute from "./routes/PrivateRoute";
 import HRRoute from "./routes/HRRoute";
+import AdminRoute from "./routes/AdminRoute";
 
 function App() {
   return (
@@ -33,7 +37,12 @@ function App() {
       <Toaster />
       <HotToaster position="top-right" />
 
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <AuthProvider>
           <NotificationProvider>
           <ApplicationProvider>
@@ -77,11 +86,23 @@ function App() {
                     />
                   </Route>
 
+                  <Route element={<AdminRoute />}>
+                    <Route path="admin" element={<AdminDashboard />} />
+                    <Route path="admin/users" element={<AdminDashboard />} />
+                    <Route path="admin/applications" element={<AdminDashboard />} />
+                    <Route path="admin/interviews" element={<AdminDashboard />} />
+                    <Route path="admin/feedback" element={<AdminDashboard />} />
+                    <Route path="admin/activity" element={<AdminDashboard />} />
+                  </Route>
+
                   <Route
                     path="components-demo"
                     element={<ComponentsDemo />}
                   />
+                  
                 </Route>
+
+                <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
           </ApplicationProvider>
@@ -93,4 +114,3 @@ function App() {
 }
 
 export default App;
-

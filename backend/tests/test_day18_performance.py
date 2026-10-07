@@ -24,7 +24,7 @@ import json
 def perf_user(test_app):
     """Create a fresh user for Day-18 performance tests."""
     with test_app.app_context():
-        hashed = bcrypt.generate_password_hash("password123").decode("utf-8")
+        hashed = bcrypt.generate_password_hash("benchmark-password").decode("utf-8")
         user = User(name="Perf User", email="perf18@example.com", password=hashed)
         db.session.add(user)
         db.session.commit()
@@ -433,4 +433,3 @@ def test_redis_cache_and_ttl(client, test_app, perf_user, perf_headers):
             assert ttl > 0, "TTL must be set"
             assert ttl <= 300, f"TTL too high: {ttl}"
             assert ttl > 290, f"TTL too low: {ttl}"
-

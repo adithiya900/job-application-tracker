@@ -339,7 +339,8 @@ def check_if_token_revoked(jwt_header, jwt_payload):
         jti=jti
     ).first()
 
-    return token is not None
+    user = db.session.get(User, jwt_payload["sub"])
+    return token is not None or (user is not None and not user.is_active)
 
 
 @jwt.needs_fresh_token_loader
@@ -533,7 +534,7 @@ def swagger_json():
 
                                     "password": {
                                         "type": "string",
-                                        "example": "password123"
+                                        "example": "example-password-123"
                                     }
 
                                 }
@@ -609,7 +610,7 @@ def swagger_json():
                                     "password": {
                                         "type": "string",
                                         "example":
-                                            "password123"
+                                            "example-password-123"
                                     }
 
                                 }
