@@ -1,4 +1,5 @@
 
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 
@@ -6,18 +7,21 @@ import { Toaster } from "@/components/ui/sonner";
 import { Toaster as HotToaster } from "react-hot-toast";
 
 import Layout from "./components/Layout";
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Applications from "./pages/Applications";
-import ComponentsDemo from "./pages/ComponentsDemo";
-import AddApplication from "./pages/AddApplication";
-import JobSearch from "./pages/JobSearch";
-import HRDashboard from "./pages/HRDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
+const Home = lazy(() => import("./pages/Home"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Applications = lazy(() => import("./pages/Applications"));
+const ComponentsDemo = lazy(() => import("./pages/ComponentsDemo"));
+const AddApplication = lazy(() => import("./pages/AddApplication"));
+const JobSearch = lazy(() => import("./pages/JobSearch"));
+const HRDashboard = lazy(() => import("./pages/HRDashboard"));
+const HRAnalytics = lazy(() => import("./pages/HRAnalytics"));
+const HRReminders = lazy(() => import("./pages/HRReminders"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const AdminReports = lazy(() => import("./pages/AdminReports"));
+const Settings = lazy(() => import("./pages/Settings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 
 import { ApplicationProvider } from "./contexts/ApplicationContext";
@@ -46,7 +50,14 @@ function App() {
         <AuthProvider>
           <NotificationProvider>
           <ApplicationProvider>
-            <Routes>
+            <Suspense
+                fallback={
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#0a0a0a" }}>
+                    <div className="spinner-gold" style={{ width: 48, height: 48 }} />
+                  </div>
+                }
+              >
+                <Routes>
               <Route path="/" element={<Layout />}>
                 <Route index element={<Home />} />
 
@@ -80,10 +91,9 @@ function App() {
                   />
 
                   <Route element={<HRRoute />}>
-                    <Route
-                      path="hr"
-                      element={<HRDashboard />}
-                    />
+                    <Route path="hr" element={<HRDashboard />} />
+                    <Route path="hr/analytics" element={<HRAnalytics />} />
+                    <Route path="hr/reminders" element={<HRReminders />} />
                   </Route>
 
                   <Route element={<AdminRoute />}>
@@ -93,18 +103,20 @@ function App() {
                     <Route path="admin/interviews" element={<AdminDashboard />} />
                     <Route path="admin/feedback" element={<AdminDashboard />} />
                     <Route path="admin/activity" element={<AdminDashboard />} />
+                    <Route path="admin/reports" element={<AdminReports />} />
                   </Route>
 
                   <Route
                     path="components-demo"
                     element={<ComponentsDemo />}
                   />
-                  
+
                 </Route>
 
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
+              </Suspense>
           </ApplicationProvider>
           </NotificationProvider>
         </AuthProvider>

@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
-import axios from "axios";
 import toast from "react-hot-toast";
 import useApplicationStore from "../stores/applicationStore";
 import api from "../services/api";
@@ -9,7 +8,7 @@ import StatusBadge, { STATUS_CONFIG } from "../components/StatusBadge";
 
 // ─── Resume Upload Cell ──────────────────────────────────────────────────────
 
-function ResumeCell({ application }) {
+const ResumeCell = memo(function ResumeCell({ application }) {
   const fetchApplications = useApplicationStore((s) => s.fetchApplications);
   const [resumeFile, setResumeFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -124,12 +123,12 @@ function ResumeCell({ application }) {
       {error && <p style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px" }}>{error}</p>}
     </div>
   );
-}
+});
 
 // ─── Application Detail Modal ────────────────────────────────────────────────
 
 function AppDetailModal({ app, onClose, onWithdraw }) {
-  const STEPS = ["APPLIED", "UNDER_REVIEW", "PHONE_SCREEN", "INTERVIEW"];
+  const STEPS = ["APPLIED", "UNDER_REVIEW", "PHONE_CALL", "INTERVIEW"];
 
   const getStep = (status) => {
     if (["OFFER"].includes(status)) return [...STEPS, "OFFER"];
@@ -140,6 +139,26 @@ function AppDetailModal({ app, onClose, onWithdraw }) {
 
   const steps = getStep(app.status);
   const currentIdx = steps.indexOf(app.status);
+
+  const downloadResume = async () => {
+    try {
+      const response = await api.get(`/api/applications/${app.id}/resume`, {
+        responseType: "blob",
+        skipErrorHandler: true,
+      });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = app.resume_path.split(/[\\/]/).pop() || "resume.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error("Failed to download resume: " + (err.response?.data?.error || err.message));
+    }
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -171,10 +190,29 @@ function AppDetailModal({ app, onClose, onWithdraw }) {
               <div style={{ fontSize: "11px", color: "#777", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>Current Status</div>
               <StatusBadge status={app.status} />
             </div>
-            {app.notes && (
+             {app.notes && (
               <div style={{ gridColumn: "1/-1" }}>
                 <div style={{ fontSize: "11px", color: "#777", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>Notes</div>
                 <div style={{ fontSize: "13px", color: "#B8B8B8", lineHeight: 1.6 }}>{app.notes}</div>
+              </div>
+            )}
+
+            {/* Resume */}
+            {app.resume_path && (
+              <div style={{ gridColumn: "1/-1" }}>
+                <div style={{ fontSize: "11px", color: "#777", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>Resume</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    onClick={downloadResume}
+                    className="btn-outline-gold"
+                    style={{ padding: "6px 14px", fontSize: "12px" }}
+                  >
+                    📄 View Resume
+                  </button>
+                  <span style={{ fontSize: "12px", color: "#777" }}>
+                    {app.resume_path.split(/[\\/]/).pop()}
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -221,51 +259,49 @@ function AppDetailModal({ app, onClose, onWithdraw }) {
             </div>
           </div>
 
-          {/* Interview Details */}
-          {app.interview_details && (
+          {/* Interview Details (Multiple Rounds) */}
+          {app.interview_details && app.interview_details.length > 0 && (
             <div style={{
               background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.2)",
               borderRadius: "10px", padding: "16px"
             }}>
               <h3 style={{ fontSize: "14px", fontWeight: 700, color: "#FFD700", marginBottom: "14px" }}>
-                🎙 Scheduled Interview
+                🎙 Scheduled Interviews ({app.interview_details.length})
               </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px" }}>
-                <div>
-                  <div style={{ color: "#777", fontSize: "11px", marginBottom: "2px" }}>Round</div>
-                  <div style={{ color: "#E8E8E8", fontWeight: 500 }}>{app.interview_details.interview_round || "—"}</div>
-                </div>
-                <div>
-                  <div style={{ color: "#777", fontSize: "11px", marginBottom: "2px" }}>Type</div>
-                  <div style={{ color: "#E8E8E8", fontWeight: 500 }}>{app.interview_details.interview_type || "—"}</div>
-                </div>
-                <div>
-                  <div style={{ color: "#777", fontSize: "11px", marginBottom: "2px" }}>Date</div>
-                  <div style={{ color: "#E8E8E8", fontWeight: 500 }}>{app.interview_details.interview_date || "—"}</div>
-                </div>
-                <div>
-                  <div style={{ color: "#777", fontSize: "11px", marginBottom: "2px" }}>Time</div>
-                  <div style={{ color: "#E8E8E8", fontWeight: 500 }}>{app.interview_details.interview_time || "—"}</div>
-                </div>
-                {app.interview_details.interviewer && (
-                  <div>
-                    <div style={{ color: "#777", fontSize: "11px", marginBottom: "2px" }}>Interviewer</div>
-                    <div style={{ color: "#E8E8E8", fontWeight: 500 }}>{app.interview_details.interviewer}</div>
+              {app.interview_details.map((interview, idx) => (
+                <div key={interview.id || idx} style={{
+                  marginBottom: idx < app.interview_details.length - 1 ? "16px" : "0",
+                  padding: "12px 14px", background: "#0B0B0B", borderRadius: "8px"
+                }}>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "#fff", marginBottom: "10px" }}>
+                    {interview.interview_round || `Round ${idx + 1}`}
                   </div>
-                )}
-                {app.interview_details.meeting_link && (
-                  <div style={{ gridColumn: "1/-1" }}>
-                    <a
-                      href={app.interview_details.meeting_link}
-                      target="_blank" rel="noreferrer"
-                      className="btn-gold"
-                      style={{ padding: "8px 16px", fontSize: "12px", textDecoration: "none", display: "inline-flex" }}
-                    >
-                      🔗 Join Interview
-                    </a>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "12px" }}>
+                    {[
+                      ["Type", interview.interview_type],
+                      ["Date", interview.interview_date],
+                      ["Time", interview.interview_time],
+                      ["Interviewer", interview.interviewer],
+                    ].map(([label, val]) => val ? (
+                      <div key={label}>
+                        <span style={{ color: "#777" }}>{label}: </span>
+                        <span style={{ color: "#B8B8B8" }}>{val}</span>
+                      </div>
+                    ) : null)}
                   </div>
-                )}
-              </div>
+                  {interview.interview_type === "Online" && interview.meeting_link && (
+                    <div style={{ marginTop: "8px" }}>
+                      <a
+                        href={interview.meeting_link}
+                        target="_blank" rel="noreferrer"
+                        style={{ color: "#D4AF37", fontSize: "12px", textDecoration: "underline" }}
+                      >
+                        🔗 Join Meeting
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
@@ -432,12 +468,14 @@ export default function Applications() {
   const openDetail = async (app) => {
     setDetailOpen(true);
     setLoadingDetail(true);
+    setSelectedApp(app);
     try {
       const res = await api.get(`/api/applications/${app.id}`, {
         skipErrorHandler: true,
       });
       setSelectedApp(res.data);
-    } catch {
+    } catch (err) {
+      console.error("Failed to fetch application details:", err);
       setSelectedApp(app);
     } finally {
       setLoadingDetail(false);
@@ -471,7 +509,10 @@ export default function Applications() {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  const statuses = Object.keys(STATUS_CONFIG);
+  const statuses = useMemo(
+    () => Object.keys(STATUS_CONFIG),
+   []
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
