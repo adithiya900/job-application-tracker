@@ -54,8 +54,12 @@ def test_v2_summary_format(test_app):
 
 
 def test_day17_documentation_files_exist():
-    project_root = Path(__file__).resolve().parents[1]
+    # Documentation and the frozen OpenAPI contract live in docs/.
+    project_root = Path(__file__).resolve().parents[2]
+    docs = project_root / "docs"
 
-    assert (project_root / "Changelog.md").exists()
-    assert (project_root / "MIGRATION_V1_TO_V2.md").exists()
+    assert (docs / "Changelog.md").exists()
+    assert (docs / "MIGRATION_V1_TO_V2.md").exists()
+    assert (docs / "API_CONTRACT.md").exists()
+    assert (docs / "openapi.json").exists()
     

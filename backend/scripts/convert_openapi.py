@@ -19,7 +19,7 @@ import json
 import urllib.request
 
 SWAGGER_URL = "http://127.0.0.1:5000/swagger.json"
-OUTPUT_FILE = "openapi.json"
+OUTPUT_FILE = "docs/openapi.json"
 
 # Endpoints that exist in the backend (api/health.py, api/jobs.py, api/admin.py)
 # but are NOT documented in the hand-written Swagger 2.0 document.

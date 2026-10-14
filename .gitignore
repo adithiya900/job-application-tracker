@@ -11,6 +11,14 @@ uploads/
 # Local AI/tool files
 .kilo/
 
+# Generated frontend build output copied into backend/static for Flask to serve.
+# The Dockerfile produces it; it is never a source file.
+backend/static/
+
+# Local logs and scheduler scratch files
+*.log
+celerybeat-schedule*
+
 # Day 32 temporary screenshots
 frontend/*.png
 

@@ -21,8 +21,10 @@ _db_peer_probe.py
 day2_orm.py
 applications.csv
 import_errors.csv
+# Markdown documentation is not needed inside the image
 *.md
-!Changelog.md
-!MIGRATION_V1_TO_V2.md
 logfile
 *.postman_collection.json
+# Exclude frontend node_modules — npm ci installs fresh inside the Docker build
+frontend/node_modules
+frontend/dist
