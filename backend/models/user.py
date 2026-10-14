@@ -60,9 +60,9 @@ class User(db.Model):
         default='UTC'
     )
 
-    # Slack webhook URL for notifications
-    webhook_url = db.Column(
-        db.String(500),
+    # Phone number for phone call interviews
+    phone_number = db.Column(
+        db.String(30),
         nullable=True
     )
 

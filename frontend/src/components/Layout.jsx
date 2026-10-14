@@ -4,19 +4,22 @@ import { useAuth } from "../contexts/AuthContext";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 
-const pageTitles = {
+  const pageTitles = {
   "/dashboard": "Dashboard",
   "/applications": "My Applications",
   "/applications/add": "Add Application",
   "/jobs": "Job Search",
-  "/settings": "Settings",
+  "/settings": "Profile & Settings",
   "/hr": "HR Portal",
+  "/hr/analytics": "HR Analytics",
+  "/hr/reminders": "HR Reminders",
   "/admin": "Admin Overview",
   "/admin/users": "User Management",
   "/admin/applications": "Application Management",
   "/admin/interviews": "Interview Management",
   "/admin/feedback": "Interview Feedback",
   "/admin/activity": "Activity Log",
+  "/admin/reports": "Admin Reports",
   "/login": "Login",
   "/register": "Register",
 };

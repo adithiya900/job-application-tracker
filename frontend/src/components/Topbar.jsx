@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationContext";
 
@@ -13,15 +14,21 @@ function timeAgo(dateStr) {
 }
 
 export default function Topbar({ onMenuClick, pageTitle }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { notifications, unreadCount, markAllRead } = useNotifications();
+  const navigate = useNavigate();
   const [panelOpen, setPanelOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const panelRef = useRef(null);
+  const profileRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
       if (panelRef.current && !panelRef.current.contains(e.target)) {
         setPanelOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -142,20 +149,81 @@ export default function Topbar({ onMenuClick, pageTitle }) {
           )}
         </div>
 
-        {/* User Avatar */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: "50%",
-            background: "linear-gradient(135deg, #D4AF37, #8B7523)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "13px", fontWeight: 700, color: "#050505"
-          }}>
-            {user?.name?.charAt(0)?.toUpperCase() || "U"}
-          </div>
-          <span style={{ fontSize: "13px", color: "#E6C65C", display: "none" }}
-            className="sm:block">
-            {user?.name?.split(" ")[0]}
-          </span>
+        {/* User Profile Dropdown */}
+        <div style={{ position: "relative" }} ref={profileRef}>
+          <button
+            onClick={() => setProfileOpen(!profileOpen)}
+            style={{
+              background: profileOpen ? "rgba(255,215,0,0.12)" : "transparent",
+              border: "1px solid " + (profileOpen ? "#D4AF37" : "#2A2A2A"),
+              borderRadius: "8px", padding: "6px 10px",
+              cursor: "pointer", color: "#E6C65C",
+              fontSize: "16px", display: "flex", alignItems: "center", gap: "6px"
+            }}
+            aria-label="User profile"
+          >
+            <div style={{
+              width: 28, height: 28, borderRadius: "50%",
+              background: "linear-gradient(135deg, #D4AF37, #8B7523)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "12px", fontWeight: 700, color: "#050505"
+            }}>
+              {user?.name?.charAt(0)?.toUpperCase() || "U"}
+            </div>
+            <span style={{ fontSize: "13px" }} className="hidden sm:inline">
+              {user?.name?.split(" ")[0]}
+            </span>
+            ▼
+          </button>
+
+          {profileOpen && (
+            <div style={{
+              position: "absolute", right: 0, top: "110%",
+              width: "220px", background: "#111111",
+              border: "1px solid #2A2A2A", borderRadius: "12px",
+              padding: "12px", boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+              zIndex: 100
+            }}>
+              <div style={{ padding: "8px 0" }}>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#fff", marginBottom: "2px" }}>
+                  {user?.name || "Unknown User"}
+                </div>
+                <div style={{ fontSize: "11px", color: "#777", marginBottom: "4px" }}>
+                  {user?.email || "No email"}
+                </div>
+                <div style={{ fontSize: "11px", color: "#D4AF37", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  {user?.role || "User"}
+                </div>
+              </div>
+              <div style={{ height: "1px", background: "#1F1F1F", margin: "10px 0" }} />
+              <button
+                onClick={() => { setProfileOpen(false); navigate("/settings"); }}
+                style={{
+                  width: "100%", padding: "8px 10px", background: "transparent",
+                  border: "none", color: "#B8B8B8", fontSize: "13px",
+                  cursor: "pointer", textAlign: "left", borderRadius: "6px",
+                  transition: "color 0.2s"
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = "#fff"}
+                onMouseLeave={e => e.currentTarget.style.color = "#B8B8B8"}
+              >
+                ⚙ Settings
+              </button>
+              <button
+                onClick={() => { setProfileOpen(false); logout(); navigate("/login"); }}
+                style={{
+                  width: "100%", padding: "8px 10px", background: "transparent",
+                  border: "none", color: "#B8B8B8", fontSize: "13px",
+                  cursor: "pointer", textAlign: "left", borderRadius: "6px",
+                  transition: "color 0.2s"
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = "#ef4444"}
+                onMouseLeave={e => e.currentTarget.style.color = "#B8B8B8"}
+              >
+                ⏻ Logout
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

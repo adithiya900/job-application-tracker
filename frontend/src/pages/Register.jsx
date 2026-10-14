@@ -9,6 +9,7 @@ function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -19,7 +20,7 @@ function Register() {
     setLoading(true);
 
     try {
-      const user = await register(name, email, password);
+      const user = await register(name, email, password, phoneNumber || undefined);
       const isHR = user?.role === "HR" || user?.role === "ADMIN";
       navigate(isHR ? "/hr" : "/dashboard");
     } catch (err) {
@@ -126,6 +127,19 @@ function Register() {
                   {showPassword ? "🙈" : "👁"}
                 </button>
               </div>
+            </div>
+
+            <div>
+              <label className="label-gold">Phone Number (Optional)</label>
+              <input
+                type="tel"
+                className="input-gold"
+                placeholder="+1 (555) 123-4567"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                maxLength={30}
+                autoComplete="tel"
+              />
             </div>
 
             <button

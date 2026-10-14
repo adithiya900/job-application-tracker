@@ -2,8 +2,15 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:5000",
+  // Dev: Vite runs on :5173 and calls the Flask API directly on :5000
+  //      (Flask-CORS allows http://localhost:5173).
+  // Prod: Flask serves this bundle on :5000, so relative = same origin.
+  baseURL: import.meta.env.DEV ? "http://127.0.0.1:5000" : "",
 });
+
+// Absolute API origin, used for the one raw-axios token-refresh call below so
+// it reaches the backend in dev too (a relative "/refresh" would hit the SPA).
+const API_ORIGIN = import.meta.env.DEV ? "http://127.0.0.1:5000" : "";
 
 let isRefreshing = false;
 let refreshSubscribers = [];
@@ -122,7 +129,7 @@ api.interceptors.response.use(
 
       try {
         const refreshResponse = await axios.post(
-          "http://127.0.0.1:5000/refresh",
+          `${API_ORIGIN}/refresh`,
           {},
           {
             headers: {

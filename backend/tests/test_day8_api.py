@@ -196,10 +196,10 @@ def test_post_api_applications(client, auth_headers):
 # ==========================================
 
 def test_get_applications_stats(client, auth_headers, test_user):
-    """Test GET /applications/stats and verify phone_screen & by_status."""
+    """Test GET /applications/stats and verify phone_call & by_status."""
     statuses = [
         ApplicationStatus.APPLIED,
-        ApplicationStatus.PHONE_SCREEN,
+        ApplicationStatus.PHONE_CALL,
         ApplicationStatus.INTERVIEW,
         ApplicationStatus.OFFER,
         ApplicationStatus.REJECTED
@@ -223,14 +223,14 @@ def test_get_applications_stats(client, auth_headers, test_user):
 
     assert data["total_applications"] == 5
     assert data["applied"] == 1
-    assert data["phone_screen"] == 1
+    assert data["phone_call"] == 1
     assert data["interview"] == 1
     assert data["rejected"] == 1
     assert data["offered"] == 1
 
     assert "by_status" in data
     assert data["by_status"]["APPLIED"] == 1
-    assert data["by_status"]["PHONE_SCREEN"] == 1
+    assert data["by_status"]["PHONE_CALL"] == 1
     assert data["by_status"]["INTERVIEW"] == 1
     assert data["by_status"]["OFFER"] == 1
     assert data["by_status"]["REJECTED"] == 1

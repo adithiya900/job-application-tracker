@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from flask_jwt_extended import decode_token
 
 from extensions import db
-from models.job import ApplicationStatus, JobApplication
+from models.job import ApplicationStatus, JobApplication, InterviewDetail
 from seed import seed_database
 from services.digest_service import send_weekly_digest
 from services.reminder_service import send_interview_reminders
@@ -30,6 +30,25 @@ def test_validation_and_http_errors_use_documented_error_shape(client, auth_head
 
     assert "company" in missing_company.get_json()["details"]
     assert "applied_date" in future_date.get_json()["details"]
+
+
+def test_spa_page_paths_do_not_shadow_the_candidate_api(client, auth_headers):
+    """The page and the candidate API share the "/applications" path."""
+    api_response = client.get("/applications", headers=auth_headers)
+    assert api_response.status_code == 200
+    assert "applications" in api_response.get_json()
+
+    page_response = client.get(
+        "/applications",
+        headers={"Accept": "text/html,application/xhtml+xml"},
+    )
+    assert page_response.status_code == 200
+    assert page_response.mimetype == "text/html"
+    assert b'<div id="root">' in page_response.data
+
+    # Built assets referenced by index.html must be served, not 404'd.
+    asset_response = client.get("/assets/index-does-not-exist.css")
+    assert asset_response.status_code == 404
 
 
 def test_unexpected_error_uses_documented_error_shape(client, auth_headers):
@@ -174,6 +193,21 @@ def test_digest_and_interview_reminder_render_and_send(test_app, test_user):
         user_id=test_user.id,
     )
     db.session.add(application)
+    db.session.commit()
+
+    interview_date = (now + timedelta(hours=24)).date()
+    interview_time = (now + timedelta(hours=24)).strftime("%H:%M")
+
+    interview = InterviewDetail(
+        application_id=application.id,
+        interview_date=interview_date,
+        interview_time=interview_time,
+        interview_round="Technical Round 1",
+        interview_type="Online",
+        meeting_link="https://meet.google.com/test",
+        interviewer="Test Interviewer",
+    )
+    db.session.add(interview)
     db.session.commit()
 
     with patch("services.digest_service.send_template_email", return_value=True) as digest_sender:

@@ -57,7 +57,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    
+
+    # Uploaded resumes live here. Without this bind mount they sit in the
+    # container's writable layer, so `docker compose up -d --build` (which
+    # recreates the container) deletes files the database still references.
+    volumes:
+      - ./backend/uploads:/app/backend/uploads
+
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=5)\""]
       interval: 10s

@@ -156,7 +156,23 @@ function AppDetailModal({ app, onClose, onWithdraw }) {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      toast.error("Failed to download resume: " + (err.response?.data?.error || err.message));
+      // With responseType "blob" the error body is a Blob, so axios cannot
+      // parse it and err.response.data.error is undefined. Read it back so the
+      // user sees the real reason ("Resume file not found") instead of a raw
+      // status code.
+      let message = err.message;
+      const data = err.response?.data;
+      if (data instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await data.text());
+          message = parsed.error || parsed.message || message;
+        } catch {
+          message = "The resume file could not be found.";
+        }
+      } else if (err.response?.data?.error) {
+        message = err.response.data.error;
+      }
+      toast.error("Failed to download resume: " + message);
     }
   };
 
@@ -402,26 +418,34 @@ export default function Applications() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [withdrawTarget, setWithdrawTarget] = useState(null);
 
-  // Listen for custom open event (from Dashboard "View" button)
+  // Arriving from the Dashboard "View" button (or a shared link) carries
+  // ?detail=<id>. The old cross-route window event never worked because this
+  // page is not mounted while the Dashboard is visible.
   useEffect(() => {
-    const handler = async (e) => {
-      const appItem = e.detail;
-      setDetailOpen(true);
-      setLoadingDetail(true);
-      try {
-        const res = await api.get(`/api/applications/${appItem.id}`, {
-          skipErrorHandler: true,
-        });
-        setSelectedApp(res.data);
-      } catch {
-        setSelectedApp(appItem);
-      } finally {
-        setLoadingDetail(false);
-      }
+    const detailId = searchParams.get("detail");
+    if (!detailId) return undefined;
+
+    let cancelled = false;
+    setDetailOpen(true);
+    setLoadingDetail(true);
+
+    api.get(`/api/applications/${detailId}`, { skipErrorHandler: true })
+      .then((res) => {
+        if (!cancelled) setSelectedApp(res.data);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        toast.error("That application could not be opened.");
+        setDetailOpen(false);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetail(false);
+      });
+
+    return () => {
+      cancelled = true;
     };
-    window.addEventListener("open-candidate-app-detail", handler);
-    return () => window.removeEventListener("open-candidate-app-detail", handler);
-  }, []);
+  }, [searchParams]);
 
   // Init from URL
   useEffect(() => {
@@ -479,6 +503,16 @@ export default function Applications() {
       setSelectedApp(app);
     } finally {
       setLoadingDetail(false);
+    }
+  };
+
+  // Closing also drops ?detail=<id> so a refresh does not reopen the modal.
+  const closeDetail = () => {
+    setDetailOpen(false);
+    if (searchParams.has("detail")) {
+      const params = new URLSearchParams(searchParams);
+      params.delete("detail");
+      setSearchParams(params);
     }
   };
 
@@ -761,7 +795,7 @@ export default function Applications() {
         ) : selectedApp ? (
           <AppDetailModal
             app={selectedApp}
-            onClose={() => setDetailOpen(false)}
+            onClose={closeDetail}
             onWithdraw={handleWithdraw}
           />
         ) : null

@@ -2,7 +2,12 @@ from flask_jwt_extended import create_access_token, decode_token
 
 from extensions import bcrypt, db
 from models.audit_log import AuditLog
-from models.job import ApplicationStatus, ApplicationStatusHistory, JobApplication
+from models.job import (
+    ApplicationStatus,
+    ApplicationStatusHistory,
+    InterviewDetail,
+    JobApplication,
+)
 from models.user import Role, User
 
 
@@ -493,3 +498,55 @@ def test_disabling_user_revokes_existing_tokens_and_blocks_login(client, test_ap
         json={"email": target.email, "password": "admin-test-password"},
     )
     assert login_response.status_code == 403
+
+
+def test_admin_application_view_filters_return_200(client, test_app):
+    """Regression: the interviews view must not use .has() on a collection."""
+    admin = _new_user("admin-views@example.com", Role.ADMIN)
+    candidate = _new_user("candidate-views@example.com", Role.USER)
+    headers = _headers_for(admin)
+
+    with_interview = JobApplication(
+        user_id=candidate.id,
+        company="Viewed Corp",
+        role="Engineer",
+        status=ApplicationStatus.INTERVIEW,
+    )
+    without_interview = JobApplication(
+        user_id=candidate.id,
+        company="Plain Corp",
+        role="Designer",
+        status=ApplicationStatus.APPLIED,
+    )
+    db.session.add_all((with_interview, without_interview))
+    db.session.commit()
+
+    db.session.add(InterviewDetail(
+        application_id=with_interview.id,
+        interview_round="Technical Round 1",
+        round_type="Technical",
+    ))
+    db.session.commit()
+
+    for view in ("", "all", "interviews", "feedback"):
+        response = client.get(
+            "/api/admin/applications",
+            query_string={"view": view},
+            headers=headers,
+        )
+        assert response.status_code == 200, view
+        assert "applications" in response.get_json()
+
+    interviews = client.get(
+        "/api/admin/applications",
+        query_string={"view": "interviews"},
+        headers=headers,
+    ).get_json()["applications"]
+    assert any(app["id"] == with_interview.id for app in interviews)
+    assert all(app["id"] != without_interview.id for app in interviews)
+
+    assert client.get(
+        "/api/admin/applications",
+        query_string={"view": "bogus"},
+        headers=headers,
+    ).status_code == 400

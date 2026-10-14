@@ -352,7 +352,7 @@ def test_get_profile_success(
     assert response_data["user"]["email"] == test_user.email
     assert response_data["user"]["role"] == test_user.role.value
     assert response_data["user"]["timezone"] == "UTC"
-    assert response_data["user"]["webhook_url"] is None
+    assert response_data["user"]["phone_number"] is None
 
 
 # ==========================================
@@ -378,8 +378,7 @@ def test_update_profile_success(
 
     data = {
         "name": "Updated Name",
-        "timezone": "America/New_York",
-        "webhook_url": "https://hooks.slack.com/services/TEST"
+        "timezone": "America/New_York"
     }
 
     response = client.put(
@@ -394,7 +393,6 @@ def test_update_profile_success(
 
     assert response_data["user"]["name"] == "Updated Name"
     assert response_data["user"]["timezone"] == "America/New_York"
-    assert response_data["user"]["webhook_url"] == "https://hooks.slack.com/services/TEST"
 
 
 # ==========================================
@@ -422,33 +420,6 @@ def test_update_profile_invalid_timezone(
     response_data = response.get_json()
 
     assert response_data["error"] == "Invalid timezone"
-
-
-# ==========================================
-# Update Profile - Invalid Webhook URL
-# ==========================================
-
-def test_update_profile_invalid_webhook(
-    client,
-    auth_headers,
-    test_user
-):
-
-    data = {
-        "webhook_url": "not-a-valid-url"
-    }
-
-    response = client.put(
-        "/profile",
-        json=data,
-        headers=auth_headers
-    )
-
-    assert response.status_code == 400
-
-    response_data = response.get_json()
-
-    assert response_data["error"] == "Invalid webhook URL format"
 
 
 # ==========================================
@@ -646,3 +617,40 @@ def test_delete_account_unauthorized(client):
     response = client.delete("/account", json={"password": "test"})
 
     assert response.status_code == 401
+
+# ==========================================
+# Profile - Slack Webhook URL removed
+# ==========================================
+
+def test_profile_does_not_expose_webhook_url(client, auth_headers):
+    """The Slack Webhook URL field must no longer be returned by the API."""
+    response = client.get("/profile", headers=auth_headers)
+
+    assert response.status_code == 200
+
+    user_payload = response.get_json()["user"]
+
+    assert "webhook_url" not in user_payload
+    assert "phone_number" in user_payload
+
+
+def test_profile_update_ignores_webhook_url(client, auth_headers, test_user):
+    """A stale client sending webhook_url must have no effect."""
+    response = client.put(
+        "/profile",
+        json={
+            "name": "Webhookless",
+            "webhook_url": "https://hooks.slack.com/services/STALE"
+        },
+        headers=auth_headers
+    )
+
+    assert response.status_code == 200
+
+    user_payload = response.get_json()["user"]
+
+    assert "webhook_url" not in user_payload
+    assert user_payload["name"] == "Webhookless"
+
+    refreshed = client.get("/profile", headers=auth_headers).get_json()["user"]
+    assert "webhook_url" not in refreshed

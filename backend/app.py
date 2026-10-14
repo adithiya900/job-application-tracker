@@ -2,7 +2,8 @@
 from models.job import JobApplication
 from models.user import User
 from models.token_blocklist import TokenBlocklist
-from flask import Flask, jsonify,request
+from flask import Flask, jsonify, request, send_from_directory
+from werkzeug.exceptions import NotFound
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
@@ -17,7 +18,7 @@ from pathlib import Path
 from flask_mail import Message
 
 from flask_jwt_extended import get_jwt
-from extensions import db, bcrypt, jwt, cache, mail
+from extensions import db, bcrypt, jwt, cache, mail, limiter
 from flask_migrate import Migrate
 from flask_swagger_ui import get_swaggerui_blueprint
 
@@ -135,14 +136,9 @@ def safe_smtp_diagnostic():
 # Create Flask App
 # =========================
 app = Flask(__name__)
-limiter = Limiter(
-    key_func=get_remote_address,
-    app=app,
-    default_limits=[
-        os.getenv("RATE_LIMIT_DEFAULT", "100 per minute")
-    ]
-)
-CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
+limiter.init_app(app)
+frontend_origins = ["http://localhost:5173", "http://localhost:5000", "http://127.0.0.1:5000", "http://127.0.0.1:5173"]
+CORS(app, resources={r"/*": {"origins": frontend_origins}})
 
 
 @app.after_request
@@ -164,6 +160,11 @@ def normalize_error_payload(response):
         "details": payload.get("details", payload.get("message", payload["error"])),
         "status_code": response.status_code,
     }
+    # Machine-readable markers the UI needs for routing (for example sending a
+    # pending/rejected HR account to its status page instead of the dashboard).
+    for extra_key in ("code", "reason"):
+        if payload.get(extra_key) is not None:
+            normalized[extra_key] = payload[extra_key]
     response.set_data(json.dumps(normalized))
     response.content_type = "application/json"
     return response
@@ -196,6 +197,23 @@ app.config["CACHE_REDIS_URL"] = os.getenv(
     "REDIS_URL", "redis://localhost:6379/0"
 )
 app.config["CACHE_DEFAULT_TIMEOUT"] = 1800
+
+# Fallback to SimpleCache if Redis is not reachable
+import socket as _socket
+try:
+    _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    _redis_host = _redis_url.split("//")[1].split(":")[0]
+    _redis_port = int(_redis_url.split(":")[2].split("/")[0])
+    _sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    _sock.settimeout(1)
+    _sock.connect((_redis_host, _redis_port))
+    _sock.close()
+    app.config["CACHE_TYPE"] = "RedisCache"
+    app.config["CACHE_REDIS_URL"] = _redis_url
+    print(f"[Cache] Using Redis at {_redis_url}")
+except Exception:
+    app.config["CACHE_TYPE"] = "SimpleCache"
+    print("[Cache] Redis unavailable, using SimpleCache")
 
 
 # =========================
@@ -1234,7 +1252,7 @@ def swagger_json():
                                         "type": "string",
                                         "enum": [
                                             "APPLIED",
-                                            "PHONE_SCREEN",
+                                             "PHONE_CALL",
                                             "INTERVIEW",
                                             "OFFER",
                                             "REJECTED"
@@ -2064,15 +2082,83 @@ def swagger_json():
 
 
 # =========================
-# Home Route
+# Frontend Catch-All Route (SPA)
 # =========================
 
-@app.route("/")
-def home():
+# Known frontend client-side routes. The catch-all serves index.html for these
+# so that direct navigation / hard refresh works. Unknown non-API paths
+# return a standard 404 so backend error-shape tests remain valid.
+_SPA_ROUTES = {
+    "",
+    "login",
+    "register",
+    "dashboard",
+    "applications",
+    "applications/add",
+    "jobs",
+    "settings",
+    "hr",
+    "hr/analytics",
+    "hr/reminders",
+    "admin",
+    "admin/users",
+    "admin/applications",
+    "admin/interviews",
+    "admin/feedback",
+    "admin/activity",
+    "admin/reports",
+    "components-demo",
+}
 
-    return jsonify({
-        "message": "Job Application Tracker API is running!"
-    }), 200
+# Same routes as _SPA_ROUTES but keyed with a leading slash. The candidate API
+# is served from the exact same path as its page ("/applications"), so a plain
+# Flask route cannot serve both. This guard answers browser navigations with
+# the SPA shell and lets API callers (whose Accept header carries
+# application/json, never text/html) keep hitting the real endpoint.
+_SPA_PAGE_PATHS = {"/" + route for route in _SPA_ROUTES}
+
+
+@app.before_request
+def serve_spa_shell_for_page_navigations():
+    if request.method != "GET":
+        return None
+    if request.path not in _SPA_PAGE_PATHS:
+        return None
+    if "text/html" not in (request.headers.get("Accept") or ""):
+        return None
+    return send_from_directory(
+        app.static_folder,
+        "index.html",
+        mimetype="text/html",
+    )
+
+
+@app.route("/")
+def index():
+    return send_from_directory(
+        app.static_folder,
+        "index.html",
+        mimetype="text/html",
+    )
+
+
+@app.route("/<path:ignored_path>")
+def catch_all(ignored_path):
+    if ignored_path.startswith("api/"):
+        return jsonify({"error": "Not found"}), 404
+    if ignored_path in _SPA_ROUTES:
+        return send_from_directory(
+            app.static_folder,
+            "index.html",
+            mimetype="text/html",
+        )
+    # Vite emits absolute asset URLs ("/assets/index-xxxx.js", "/favicon.svg"),
+    # so real built files must be served from the static folder rather than
+    # falling through to a JSON 404.
+    try:
+        return send_from_directory(app.static_folder, ignored_path)
+    except NotFound:
+        return jsonify({"error": "Not found"}), 404
 
 
 if __name__ == "__main__":

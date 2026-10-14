@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   timezone: z.string().min(1, "Timezone is required"),
-  webhook_url: z.string().url("Invalid URL").optional().or(z.literal("")),
+  phone_number: z.string().max(30, "Phone number must be 30 characters or fewer").optional().or(z.literal("")),
 });
 
 const passwordSchema = z.object({
@@ -26,6 +26,15 @@ const deleteSchema = z.object({
 
 const TABS = ["profile", "security", "notifications", "danger"];
 const TAB_LABELS = { profile: "Profile", security: "Security", notifications: "Notifications", danger: "Danger Zone" };
+
+const Card = ({ children }) => (
+  <div style={{
+    background: "#111111", border: "1px solid #1F1F1F",
+    borderRadius: "14px", padding: "28px 24px"
+  }}>
+    {children}
+  </div>
+);
 
 const TIMEZONES = [
   "UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
@@ -65,7 +74,11 @@ export default function Settings() {
     formState: { errors: eProfile, isSubmitting: sProfile },
   } = useForm({
     resolver: zodResolver(profileSchema),
-    defaultValues: { name: user?.name || "", timezone: user?.timezone || "UTC", webhook_url: user?.webhook_url || "" },
+    defaultValues: {
+      name: user?.name || "",
+      timezone: user?.timezone || "UTC",
+      phone_number: user?.phone_number || ""
+    },
   });
 
   const {
@@ -83,7 +96,7 @@ export default function Settings() {
 
   const onProfile = async (data) => {
     try {
-      await updateProfile({ name: data.name, timezone: data.timezone, webhook_url: data.webhook_url || undefined });
+      await updateProfile({ name: data.name, timezone: data.timezone, phone_number: data.phone_number || undefined });
       toast.success("Profile updated!");
     } catch { toast.error("Failed to update profile"); }
   };
@@ -105,16 +118,7 @@ export default function Settings() {
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to delete account");
     } finally { setDeleting(false); setConfirmDelete(false); }
-  };
-
-  const Card = ({ children }) => (
-    <div style={{
-      background: "#111111", border: "1px solid #1F1F1F",
-      borderRadius: "14px", padding: "28px 24px"
-    }}>
-      {children}
-    </div>
-  );
+   };
 
   return (
     <div style={{ maxWidth: "680px", display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -193,19 +197,19 @@ export default function Settings() {
               <p style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>Email cannot be changed.</p>
             </FieldGroup>
 
-            <FieldGroup label="Timezone">
-              <select className="input-gold" {...rProfile("timezone")}>
-                {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
-              </select>
-              <ErrorMsg msg={eProfile.timezone?.message} />
-            </FieldGroup>
+             <FieldGroup label="Timezone">
+               <select className="input-gold" {...rProfile("timezone")}>
+                 {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+               </select>
+               <ErrorMsg msg={eProfile.timezone?.message} />
+             </FieldGroup>
 
-            <FieldGroup label="Slack Webhook URL (Optional)"
-              hint="Enter a Slack webhook URL to receive interview notifications.">
-              <input className="input-gold" type="url" placeholder="https://hooks.slack.com/services/..."
-                {...rProfile("webhook_url")} />
-              <ErrorMsg msg={eProfile.webhook_url?.message} />
-            </FieldGroup>
+              <FieldGroup label="Phone Number (for Phone Call interviews)"
+                hint="Used when scheduling phone call interviews. Format: +1234567890">
+                <input className="input-gold" placeholder="+1 (555) 123-4567"
+                  {...rProfile("phone_number")} />
+                <ErrorMsg msg={eProfile.phone_number?.message} />
+              </FieldGroup>
 
             <button type="submit" className="btn-gold" disabled={sProfile} style={{ alignSelf: "flex-start", padding: "10px 24px" }}>
               {sProfile ? "Saving..." : "Save Changes"}
@@ -260,19 +264,6 @@ export default function Settings() {
               <p style={{ fontSize: "13px", color: "#B8B8B8" }}>
                 You receive real-time notifications via Server-Sent Events (SSE) when your application status changes, interviews are scheduled, or other updates occur.
               </p>
-            </div>
-
-            <div>
-              <label className="label-gold">Slack Webhook URL</label>
-              <input
-                className="input-gold"
-                type="url"
-                defaultValue={user?.webhook_url || ""}
-                placeholder="https://hooks.slack.com/services/..."
-                readOnly
-                style={{ cursor: "not-allowed", opacity: 0.6 }}
-              />
-              <p style={{ fontSize: "11px", color: "#555", marginTop: "4px" }}>Manage your webhook URL in the Profile tab.</p>
             </div>
 
             <div>

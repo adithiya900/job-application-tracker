@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import StatusBadge from "../components/StatusBadge";
@@ -10,7 +10,7 @@ const STAT_CARDS = [
   { key: "total_applications", label: "Total", icon: "📊", accent: "#FFD700" },
   { key: "APPLIED",            label: "Applied",       icon: "📝", accent: "#D4AF37" },
   { key: "UNDER_REVIEW",       label: "Under Review",  icon: "🔍", accent: "#F5C542" },
-  { key: "PHONE_SCREEN",       label: "Phone Screen",  icon: "📞", accent: "#E8B84B" },
+  { key: "PHONE_CALL",       label: "Phone Call",  icon: "📞", accent: "#E8B84B" },
   { key: "INTERVIEW",          label: "Interview",     icon: "🎙", accent: "#FFD700" },
   { key: "OFFER",              label: "Offers",        icon: "🎉", accent: "#22c55e" },
   { key: "REJECTED",           label: "Rejected",      icon: "❌", accent: "#ef4444" },
@@ -25,6 +25,7 @@ function Skeleton({ width = "100%", height = "20px" }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { notifications } = useNotifications();
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -204,9 +205,7 @@ export default function Dashboard() {
                       <button
                         className="btn-outline-gold"
                         style={{ padding: "6px 14px", fontSize: "12px" }}
-                        onClick={() => {
-                          window.dispatchEvent(new CustomEvent("open-candidate-app-detail", { detail: app }));
-                        }}
+                        onClick={() => navigate(`/applications?detail=${app.id}`)}
                       >
                         View
                       </button>

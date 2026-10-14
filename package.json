@@ -1,0 +1,14 @@
+{
+  "name": "job-application-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Job Application Tracker - full-stack project. Frontend lives in frontend/, backend in backend/. This root manifest provides convenience scripts that delegate to the frontend directory.",
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "dev:backend": "cd backend && flask --app app run --host 127.0.0.1 --port 5000",
+    "test": "cd backend && python -m pytest tests/ -q"
+  },
+  "workspaces": []
+}

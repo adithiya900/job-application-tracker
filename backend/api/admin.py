@@ -59,6 +59,8 @@ def _application_data(application, include_details=False):
         "interview_at": application.interview_at.isoformat() if application.interview_at else None,
         "notes": application.notes,
         "resume_path": application.resume_path,
+        "is_shortlisted": application.is_shortlisted,
+        "tags": [t.strip() for t in (application.tags or "").split(",") if t.strip()],
         "user_id": application.user_id,
         "candidate": {
             "id": candidate.id,
@@ -66,8 +68,8 @@ def _application_data(application, include_details=False):
             "email": candidate.email,
         } if candidate else None,
         "interview_details": (
-            application.interview_details.to_dict(include_hr_notes=True)
-            if application.interview_details else None
+            [item.to_dict(include_hr_notes=True) for item in application.interview_details]
+            if application.interview_details else []
         ),
     }
     if include_details:
@@ -407,7 +409,7 @@ def list_applications():
         except KeyError:
             return jsonify({"error": "Invalid status filter"}), 400
     if view == "interviews":
-        query = query.filter(JobApplication.interview_details.has())
+        query = query.filter(JobApplication.interview_details.any())
     elif view == "feedback":
         query = query.filter(JobApplication.feedback.any())
     elif view not in ("", "all"):
@@ -686,3 +688,200 @@ def list_activity():
             "created_at": item.created_at.isoformat(),
         })
     return jsonify(_page_payload(pagination, entries, "activity")), 200
+
+
+# ==============================================================
+# GET /api/admin/reports
+# Admin reporting/analytics endpoint with filters
+# ==============================================================
+
+@admin_bp.route("/api/admin/reports", methods=["GET"])
+@admin_required
+def reports():
+    try:
+        from datetime import date, datetime, timedelta
+        from sqlalchemy import func
+
+        report_type = request.args.get("type", "overview")
+        date_from = request.args.get("from")
+        date_to = request.args.get("to")
+
+        # Parse date range
+        try:
+            if date_from:
+                date_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+            if date_to:
+                date_to = datetime.strptime(date_to, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"error": "Invalid date format (use YYYY-MM-DD)"}), 400
+
+        # Default to last 90 days
+        if not date_from:
+            date_from = date.today() - timedelta(days=90)
+        if not date_to:
+            date_to = date.today()
+
+        if report_type == "applications":
+            # Applications report
+            status_query = (
+                db.session.query(
+                    JobApplication.status,
+                    func.count().label("count")
+                )
+                .filter(
+                    JobApplication.applied_date >= date_from,
+                    JobApplication.applied_date <= date_to
+                )
+                .group_by(JobApplication.status)
+                .all()
+            )
+
+            status_data = {status.value: count for status, count in status_query}
+            total = sum(status_data.values())
+
+            # Daily trend
+            daily_trend = (
+                db.session.query(
+                    func.cast(JobApplication.applied_date, db.String(10)).label("day"),
+                    func.count().label("count")
+                )
+                .filter(
+                    JobApplication.applied_date >= date_from,
+                    JobApplication.applied_date <= date_to
+                )
+                .group_by("day")
+                .order_by("day")
+                .all()
+            )
+
+            # Top companies
+            top_companies = (
+                db.session.query(
+                    JobApplication.company,
+                    func.count().label("count")
+                )
+                .filter(
+                    JobApplication.applied_date >= date_from,
+                    JobApplication.applied_date <= date_to
+                )
+                .group_by(JobApplication.company)
+                .order_by(func.count().desc())
+                .limit(10)
+                .all()
+            )
+
+            return jsonify({
+                "report_type": "applications",
+                "period": {"from": date_from.isoformat(), "to": date_to.isoformat()},
+                "total_applications": total,
+                "by_status": status_data,
+                "daily_trend": [{"date": r[0], "count": r[1]} for r in daily_trend],
+                "top_companies": [{"company": r[0], "count": r[1]} for r in top_companies],
+            }), 200
+
+        elif report_type == "users":
+            # Users report
+            role_query = (
+                db.session.query(
+                    User.role,
+                    func.count().label("count")
+                )
+                .filter(
+                    User.created_at >= datetime.combine(date_from, datetime.min.time()),
+                    User.created_at <= datetime.combine(date_to, datetime.max.time())
+                )
+                .group_by(User.role)
+                .all()
+            )
+
+            role_data = {}
+            for role, count in role_query:
+                role_data[role.value] = count
+
+            weekly_growth = (
+                db.session.query(
+                    func.cast(User.created_at, db.String(10)).label("day"),
+                    func.count().label("count")
+                )
+                .filter(
+                    User.created_at >= datetime.combine(date_from, datetime.min.time()),
+                    User.created_at <= datetime.combine(date_to, datetime.max.time())
+                )
+                .group_by("day")
+                .order_by("day")
+                .all()
+            )
+
+            return jsonify({
+                "report_type": "users",
+                "period": {"from": date_from.isoformat(), "to": date_to.isoformat()},
+                "total_users": User.query.count(),
+                "by_role": role_data,
+                "weekly_growth": [{"date": r[0], "count": r[1]} for r in weekly_growth],
+                "active_users": User.query.filter_by(is_active=True).count(),
+            }), 200
+
+        elif report_type == "feedback":
+            # Feedback/interview report
+            feedback_query = (
+                db.session.query(
+                    InterviewFeedback.recommendation,
+                    func.count().label("count"),
+                    func.avg(InterviewFeedback.rating).label("avg_rating")
+                )
+                .filter(
+                    InterviewFeedback.created_at >= datetime.combine(date_from, datetime.min.time()),
+                    InterviewFeedback.created_at <= datetime.combine(date_to, datetime.max.time())
+                )
+                .group_by(InterviewFeedback.recommendation)
+                .all()
+            )
+
+            feedback_data = [
+                {
+                    "recommendation": item[0],
+                    "count": item[1],
+                    "average_rating": round(float(item[2]), 2) if item[2] else None
+                }
+                for item in feedback_query
+            ]
+
+            return jsonify({
+                "report_type": "feedback",
+                "period": {"from": date_from.isoformat(), "to": date_to.isoformat()},
+                "total_feedback": InterviewFeedback.query.count(),
+                "by_recommendation": feedback_data,
+                "shortlisted_count": JobApplication.query.filter_by(is_shortlisted=True).count(),
+            }), 200
+
+        else:
+            # Overview report (default)
+            return jsonify({
+                "report_type": "overview",
+                "period": {"from": date_from.isoformat(), "to": date_to.isoformat()},
+                "summary": {
+                    "total_users": User.query.count(),
+                    "total_applications": JobApplication.query.count(),
+                    "total_interviews": InterviewDetail.query.count(),
+                    "total_feedback": InterviewFeedback.query.count(),
+                    "total_shortlisted": JobApplication.query.filter_by(is_shortlisted=True).count(),
+                    "active_users": User.query.filter_by(is_active=True).count(),
+                },
+                "applications_by_status": {
+                    s.value: JobApplication.query.filter_by(status=s).count()
+                    for s in ApplicationStatus
+                },
+                "users_by_role": {
+                    r.value: User.query.filter_by(role=r).count()
+                    for r in Role
+                },
+            }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==============================================================
+# GET /api/admin/activity/summary
+# Quick summary of recent activity for admin dashboard
+# ==============================================================

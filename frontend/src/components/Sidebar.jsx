@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -11,6 +12,8 @@ const CandidateNav = [
 
 const HRNav = [
   { to: "/hr", icon: "⊞", label: "HR Dashboard" },
+  { to: "/hr/analytics", icon: "📊", label: "Analytics" },
+  { to: "/hr/reminders", icon: "🔔", label: "Reminders" },
   { to: "/settings", icon: "⚙", label: "Profile & Settings" },
 ];
 
@@ -18,22 +21,25 @@ const AdminNav = [
   { to: "/admin", icon: "⊞", label: "Overview" },
   { to: "/admin/users", icon: "♙", label: "User Management" },
   { to: "/admin/applications", icon: "▤", label: "Applications" },
-  { to: "/admin/interviews", icon: "◷", label: "Interviews" },
+  { to: "/admin/reports", icon: "📈", label: "Reports" },
+  { to: "/admin/interviews", icon: "🎙", label: "Interviews" },
   { to: "/admin/feedback", icon: "✎", label: "Feedback" },
   { to: "/jobs", icon: "⌕", label: "Job Search" },
-  { to: "/admin/activity", icon: "◴", label: "Activity Log" },
+  { to: "/admin/activity", icon: "◷", label: "Activity Log" },
   { to: "/settings", icon: "⚙", label: "Profile & Settings" },
 ];
 
 export default function Sidebar({ mobileOpen, onClose }) {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const isAdmin = user?.role === "ADMIN";
   const isHR = user?.role === "HR";
   const navItems = isAdmin ? AdminNav : isHR ? HRNav : CandidateNav;
 
   const handleLogout = async () => {
+    setShowLogoutConfirm(false);
     await logout();
     navigate("/login");
   };
@@ -74,35 +80,8 @@ export default function Sidebar({ mobileOpen, onClose }) {
           </div>
         </div>
 
-        {/* User Info */}
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #1A1A1A" }}>
-          <div style={{
-            background: "rgba(255,215,0,0.06)", border: "1px solid #2A2A2A",
-            borderRadius: "10px", padding: "12px"
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: "50%",
-                background: "linear-gradient(135deg, #D4AF37, #8B7523)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "13px", fontWeight: 700, color: "#050505", flexShrink: 0
-              }}>
-                {user?.name?.charAt(0)?.toUpperCase() || "U"}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "#FFD700", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {user?.name || "User"}
-                </div>
-                <div style={{ fontSize: "11px", color: "#A88A2A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {user?.email || ""}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav className="sidebar-nav">
+        {/* Scrollable Nav */}
+        <nav className="sidebar-nav sidebar-nav-scroll">
           {navItems.map(({ to, icon, label }) => (
             <NavLink
               key={to}
@@ -118,10 +97,11 @@ export default function Sidebar({ mobileOpen, onClose }) {
           ))}
         </nav>
 
-        {/* Footer */}
+        {/* Footer - fixed at bottom with Logout */}
         <div className="sidebar-footer">
+          {/* Logout Button */}
           <button
-            onClick={handleLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             style={{
               display: "flex", alignItems: "center", gap: "10px",
               padding: "10px 14px", borderRadius: "8px",
@@ -137,6 +117,46 @@ export default function Sidebar({ mobileOpen, onClose }) {
           </button>
         </div>
       </aside>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div style={{
+          position: "fixed", inset: 0,
+          background: "rgba(0,0,0,0.7)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: "#111", border: "1px solid #2A2A2A",
+            borderRadius: "16px", padding: "28px", maxWidth: "400px",
+            textAlign: "center"
+          }}>
+            <div style={{ fontSize: "36px", marginBottom: "12px" }}>⏻</div>
+            <h3 style={{ fontSize: "18px", fontWeight: 600, color: "#fff", marginBottom: "8px" }}>
+              Confirm Logout
+            </h3>
+            <p style={{ fontSize: "14px", color: "#777", marginBottom: "22px" }}>
+              Are you sure you want to log out? You'll need to sign in again to access your account.
+            </p>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="btn-outline-gold"
+                style={{ padding: "10px 20px", fontSize: "13px" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogout}
+                className="btn-gold"
+                style={{ padding: "10px 20px", fontSize: "13px" }}
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

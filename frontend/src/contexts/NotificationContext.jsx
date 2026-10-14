@@ -76,8 +76,22 @@ export function NotificationProvider({ children }) {
       }
     );
 
+    // React only runs the cleanup above on unmount, which never happens for a
+    // full page load / hard refresh. Without releasing the stream on unload the
+    // browser keeps the socket open and eventually exhausts its per-host
+    // connection limit, which stalls every later navigation.
+    const releaseStream = () => {
+      if (controller) {
+        controller.abort();
+      }
+    };
+    window.addEventListener("pagehide", releaseStream);
+    window.addEventListener("beforeunload", releaseStream);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("pagehide", releaseStream);
+      window.removeEventListener("beforeunload", releaseStream);
 
       if (controller) {
         controller.abort();

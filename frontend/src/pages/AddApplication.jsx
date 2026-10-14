@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import useApplicationStore from "../stores/applicationStore";
+import api from "../services/api";
 import toast from "react-hot-toast";
 
 const schema = z.object({
@@ -11,6 +12,7 @@ const schema = z.object({
   role: z.string().min(2, "Role is required"),
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
+  tags: z.string().optional(),
 });
 
 export default function AddApplication() {
@@ -21,6 +23,9 @@ export default function AddApplication() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState(null);
+  
+  const [resumeFile, setResumeFile] = useState(null);
+  const [resumeError, setResumeError] = useState("");
 
   const trackedJob = location.state?.job;
 
@@ -31,6 +36,7 @@ export default function AddApplication() {
       role: "",
       date: new Date().toISOString().split("T")[0],
       notes: "",
+      tags: "",
     },
   });
 
@@ -42,11 +48,12 @@ export default function AddApplication() {
       trackedJob.link ? `Job Link: ${trackedJob.link}` : "",
     ].filter(Boolean).join("\n");
 
-    reset({
+      reset({
       company: trackedJob.company || "",
       role: trackedJob.role || "",
       date: new Date().toISOString().split("T")[0],
       notes,
+      tags: "",
     });
   }, [trackedJob, reset]);
 
@@ -62,7 +69,21 @@ export default function AddApplication() {
         status: "APPLIED",
         notes: data.notes || "",
         applied_date: data.date,
+        tags: data.tags ? data.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       });
+
+      if (resumeFile) {
+        try {
+          const fd = new FormData();
+          fd.append("resume", resumeFile);
+          await api.post(`/api/applications/${created.id}/resume`, fd, {
+            skipErrorHandler: true,
+          });
+          toast.success("Resume uploaded successfully!");
+        } catch (err) {
+          toast.error("Resume upload failed: " + (err.response?.data?.error || err.message));
+        }
+      }
 
       setSuccess(created);
       toast.success(`✅ Application added: ${created.company} — ${created.role}`);
@@ -178,18 +199,66 @@ export default function AddApplication() {
             </span>
           </div>
 
-          {/* Date */}
-          <div>
-            <label className="label-gold">Application Date *</label>
-            <input
-              type="date"
-              className={`input-gold ${errors.date ? "border-red-500" : ""}`}
-              {...register("date")}
-            />
-            {errors.date && (
-              <p style={{ fontSize: "12px", color: "#ef4444", marginTop: "4px" }}>{errors.date.message}</p>
-            )}
-          </div>
+           {/* Date */}
+           <div>
+             <label className="label-gold">Application Date *</label>
+             <input
+               type="date"
+               className={`input-gold ${errors.date ? "border-red-500" : ""}`}
+               {...register("date")}
+             />
+             {errors.date && (
+               <p style={{ fontSize: "12px", color: "#ef4444", marginTop: "4px" }}>{errors.date.message}</p>
+             )}
+           </div>
+
+           {/* Resume Upload */}
+           <div>
+             <label className="label-gold">Resume (PDF)</label>
+             <div style={{
+               border: `2px dashed ${resumeFile ? "#22C55E" : "#2A2A2A"}`,
+               borderRadius: "10px", padding: "20px", textAlign: "center",
+               background: resumeFile ? "rgba(34,197,94,0.04)" : "transparent",
+               transition: "all 0.2s"
+             }}>
+               <input
+                 type="file"
+                 accept="application/pdf"
+                 onChange={(e) => {
+                   const file = e.target.files?.[0];
+                   if (file) {
+                     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+                       setResumeError("Only PDF files are allowed.");
+                       setResumeFile(null);
+                       return;
+                     }
+                     if (file.size > 5 * 1024 * 1024) {
+                       setResumeError("File size must be under 5MB.");
+                       setResumeFile(null);
+                       return;
+                     }
+                     setResumeFile(file);
+                     setResumeError("");
+                   }
+                 }}
+                 style={{ display: "none" }}
+                 id="resume-upload"
+               />
+               <label htmlFor="resume-upload" style={{ cursor: "pointer", display: "block" }}>
+                 <span style={{ fontSize: "24px", marginBottom: "8px", display: "block" }}>📎</span>
+                 {resumeFile ? (
+                   <span style={{ fontSize: "13px", color: "#22C55E", fontWeight: 500 }}>
+                     {resumeFile.name}
+                   </span>
+                 ) : (
+                   <span style={{ fontSize: "13px", color: "#777" }}>
+                     Upload your resume (PDF, max 5MB)
+                   </span>
+                 )}
+               </label>
+             </div>
+             {resumeError && <p style={{ fontSize: "12px", color: "#ef4444", marginTop: "4px" }}>{resumeError}</p>}
+           </div>
 
           {/* Notes */}
           <div>
@@ -202,8 +271,21 @@ export default function AddApplication() {
               placeholder="Recruiter contact, salary info, source link, etc."
               rows={4}
               style={{ resize: "vertical" }}
-              {...register("notes")}
+              {...    register("notes")}
             />
+          </div>
+
+          {/* Tags */}
+          <div>
+            <label className="label-gold">Tags (Optional)</label>
+            <input
+              className="input-gold"
+              placeholder="e.g. Startup, Remote, FAANG (comma separated)"
+              {...register("tags")}
+            />
+            {errors.tags && (
+              <p style={{ fontSize: "12px", color: "#ef4444", marginTop: "4px" }}>{errors.tags.message}</p>
+            )}
           </div>
 
           {/* Actions */}

@@ -4,7 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from models.user import User
 from services.digest_service import send_weekly_digest
-from services.reminder_service import send_interview_reminders
+from services.reminder_service import send_interview_reminders, send_follow_up_reminders
 
 
 def start_scheduler(app):
@@ -26,6 +26,7 @@ def start_scheduler(app):
     def run_reminders():
         with app.app_context():
             send_interview_reminders()
+            send_follow_up_reminders()
 
     def run_weekly_digest():
         with app.app_context():

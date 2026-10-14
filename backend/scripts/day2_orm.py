@@ -44,7 +44,7 @@ with app.app_context():
         job2 = JobApplication(
             company="Microsoft",
             role="Backend Developer",
-            status=ApplicationStatus.PHONE_SCREEN,
+            status=ApplicationStatus.PHONE_CALL,
             notes="Phone interview scheduled",
             user_id=user.id
         )

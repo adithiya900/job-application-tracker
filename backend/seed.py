@@ -85,7 +85,7 @@ def seed_database():
 
         examples = [
             ("Google", "Software Engineer", ApplicationStatus.APPLIED),
-            ("Microsoft", "Backend Developer", ApplicationStatus.PHONE_SCREEN),
+            ("Microsoft", "Backend Developer", ApplicationStatus.PHONE_CALL),
             ("Amazon", "Python Developer", ApplicationStatus.INTERVIEW),
         ]
         created = 0

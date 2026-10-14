@@ -65,7 +65,8 @@ class ApplicationService:
             ),
             interview_at=data.get("interview_at"),
             notes=sanitize_notes(data.get("notes")),
-            user_id=user_id
+            user_id=user_id,
+            tags=",".join(data.get("tags", [])) if isinstance(data.get("tags"), list) else (data.get("tags") or None),
         )
 
         if "applied_date" in data:
@@ -265,6 +266,14 @@ class ApplicationService:
 
             application.applied_date = data["applied_date"]
 
+        # Tags
+        if "tags" in data:
+            tags_val = data["tags"]
+            if isinstance(tags_val, list):
+                application.tags = ",".join(tags_val)
+            elif isinstance(tags_val, str):
+                application.tags = tags_val
+
         # =========================
         # Save Changes
         # =========================
@@ -278,9 +287,6 @@ class ApplicationService:
         # Send Email When Status Changes
         # =========================
         if old_status != application.status:
-            if application.status == ApplicationStatus.OFFER:
-                WebhookService.send_slack_offer_notification(application)
-
             user = db.session.get(User, user_id)
 
             if user and user.email:
@@ -457,7 +463,7 @@ class ApplicationService:
             "total_applications": total_applications,
             "applied": by_status.get("APPLIED", 0),
             "under_review": by_status.get("UNDER_REVIEW", 0),
-            "phone_screen": by_status.get("PHONE_SCREEN", 0),
+            "phone_call": by_status.get("PHONE_CALL", 0),
             "interview": by_status.get("INTERVIEW", 0),
             "rejected": by_status.get("REJECTED", 0),
             "offered": by_status.get("OFFER", 0),

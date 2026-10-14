@@ -11,7 +11,7 @@ from datetime import date
 
 VALID_STATUSES = [
     "APPLIED",
-    "PHONE_SCREEN",
+    "PHONE_CALL",
     "INTERVIEW",
     "OFFER",
     "REJECTED"

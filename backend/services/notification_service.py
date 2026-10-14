@@ -65,6 +65,19 @@ def publish_admin_notification(notification_type, message, data=None):
         )
 
 
+def publish_human_resource_notification(notification_type, message, data=None):
+    """Publish a management event to every current HR user."""
+    from models.user import Role, User
+
+    for hr_user in User.query.filter_by(role=Role.HR).all():
+        publish_notification(
+            user_id=hr_user.id,
+            notification_type=notification_type,
+            message=message,
+            data=data,
+        )
+
+
 def subscribe_to_notifications():
     """
     Subscribe to the application notification channel.

@@ -2,6 +2,22 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
+// Credentials kept on this device only when "Remember me" is ticked.
+// This is a convenience encoding, NOT encryption: anyone with access to this
+// browser profile can read it back. A browser password manager is the secure
+// alternative, which is why the inputs also carry proper autofill metadata.
+const REMEMBER_EMAIL_KEY = "remembered_email";
+const REMEMBER_PASSWORD_KEY = "remembered_password";
+
+const encodeCredential = (value) => btoa(encodeURIComponent(value));
+const decodeCredential = (value) => {
+  try {
+    return decodeURIComponent(atob(value));
+  } catch {
+    return "";
+  }
+};
+
 const features = [
   { icon: "🎯", text: "Apply for jobs & track every application" },
   { icon: "📊", text: "Monitor application progress in real-time" },
@@ -14,11 +30,14 @@ function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(() => localStorage.getItem(REMEMBER_EMAIL_KEY) || "");
+  const [password, setPassword] = useState(() => decodeCredential(localStorage.getItem(REMEMBER_PASSWORD_KEY) || ""));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(
+    () => !!localStorage.getItem(REMEMBER_EMAIL_KEY)
+  );
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -27,6 +46,15 @@ function Login() {
 
     try {
       const loggedInUser = await login(email, password);
+
+      if (rememberMe) {
+        localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+        localStorage.setItem(REMEMBER_PASSWORD_KEY, encodeCredential(password));
+      } else {
+        localStorage.removeItem(REMEMBER_EMAIL_KEY);
+        localStorage.removeItem(REMEMBER_PASSWORD_KEY);
+      }
+
       const destination = loggedInUser?.role === "ADMIN"
         ? "/admin"
         : loggedInUser?.role === "HR"
@@ -165,12 +193,16 @@ function Login() {
                 <label className="label-gold">Email Address</label>
                 <input
                   type="email"
+                  name="email"
                   className="input-gold"
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck="false"
                 />
               </div>
 
@@ -180,6 +212,7 @@ function Login() {
                 <div style={{ position: "relative" }}>
                   <input
                     type={showPassword ? "text" : "password"}
+                    name="password"
                     className="input-gold"
                     placeholder="••••••••"
                     value={password}
@@ -203,16 +236,57 @@ function Login() {
                 </div>
               </div>
 
-              {/* Submit */}
-              <button
-                type="submit"
-                className="btn-gold"
-                disabled={loading}
-                style={{
-                  width: "100%", justifyContent: "center",
-                  padding: "13px", fontSize: "15px", marginTop: "4px"
-                }}
-              >
+               {/* Remember me & Submit */}
+               <div>
+                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                   <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                     <input
+                       type="checkbox"
+                       name="remember"
+                       checked={rememberMe}
+                       onChange={(e) => setRememberMe(e.target.checked)}
+                       style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                     />
+                     <span style={{ fontSize: "13px", color: "#B8B8B8" }}>Remember me</span>
+                   </label>
+                   {rememberMe && (
+                     <button
+                       type="button"
+                       onClick={() => {
+                         localStorage.removeItem(REMEMBER_EMAIL_KEY);
+                         localStorage.removeItem(REMEMBER_PASSWORD_KEY);
+                         setRememberMe(false);
+                         setEmail("");
+                         setPassword("");
+                       }}
+                       style={{
+                         background: "none", border: "none", padding: 0,
+                         color: "#777", fontSize: "11px", cursor: "pointer",
+                         textDecoration: "underline"
+                       }}
+                       title="Delete the credentials stored on this device"
+                     >
+                       Forget saved login
+                     </button>
+                   )}
+                 </div>
+                 <p style={{ fontSize: "11px", color: "#666", lineHeight: 1.5 }}>
+                   {rememberMe
+                     ? "Your email and password are stored on this device only, so both fields are filled automatically next time."
+                     : "Tick this to auto-fill your email and password next time on this device."}
+                 </p>
+               </div>
+
+               {/* Submit */}
+               <button
+                 type="submit"
+                 className="btn-gold"
+                 disabled={loading}
+                 style={{
+                   width: "100%", justifyContent: "center",
+                   padding: "13px", fontSize: "15px", marginTop: "4px"
+                 }}
+               >
                 {loading ? (
                   <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{

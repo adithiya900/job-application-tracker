@@ -39,6 +39,27 @@ def register():
             "error": "Name, email and password are required"
         }), 400
 
+    phone_number = data.get("phone_number")
+    if phone_number is not None:
+        phone_number = phone_number.strip()
+        if len(phone_number) > 30:
+            return jsonify({"error": "Phone number must be 30 characters or fewer"}), 400
+        if phone_number:
+            phone_number = re.sub(r'\s+', ' ', phone_number)
+        else:
+            phone_number = None
+
+    # Public registration always creates a candidate account. Accepting a role
+    # here would let anyone grant themselves HR or ADMIN rights.
+    requested_role = data.get("role")
+    if requested_role is not None:
+        requested_role = str(requested_role).upper()
+        if requested_role in ("HR", "ADMIN"):
+            return jsonify({
+                "error": "Public registration cannot assign elevated roles. "
+                         "HR accounts are provisioned by an administrator."
+            }), 403
+
     existing_user = User.query.filter_by(
         email=data["email"]
     ).first()
@@ -52,18 +73,12 @@ def register():
         data["password"]
     ).decode("utf-8")
 
-    # Allow role specification for HR registration (must be validated by admin in prod)
-    role = Role.USER
-    if data.get("role") in ("HR", "ADMIN"):
-        # Only allow role escalation if there is a valid admin token
-        # For simplicity, HR accounts should be created by admin
-        role = Role.USER  # Default to USER for self-registration
-
     user = User(
         name=data["name"],
         email=data["email"],
         password=hashed_password,
-        role=role
+        role=Role.USER,
+        phone_number=phone_number
     )
 
     db.session.add(user)
@@ -90,7 +105,8 @@ def register():
             "id": user.id,
             "name": user.name,
             "email": user.email,
-            "role": user.role.value
+            "role": user.role.value,
+            "phone_number": user.phone_number
         }
     }), 201
 
@@ -244,7 +260,7 @@ def get_profile():
             "email": user.email,
             "role": user.role.value,
             "timezone": user.timezone,
-            "webhook_url": user.webhook_url
+            "phone_number": user.phone_number
         }
     }), 200
 
@@ -283,21 +299,12 @@ def update_profile():
             except Exception:
                 return jsonify({"error": "Invalid timezone"}), 400
 
-    # Update webhook_url if provided (validate URL format)
-    if "webhook_url" in data:
-        webhook_url = data["webhook_url"]
-        if webhook_url:
-            # Basic URL validation
-            url_pattern = re.compile(
-                r'^https?://'  # http:// or https://
-                r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
-                r'localhost|'  # localhost...
-                r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
-                r'(?::\d+)?'  # optional port
-                r'(?:/?|[/?]\S+)$', re.IGNORECASE)
-            if not url_pattern.match(webhook_url):
-                return jsonify({"error": "Invalid webhook URL format"}), 400
-        user.webhook_url = webhook_url
+    # Update phone_number if provided
+    if "phone_number" in data:
+        phone_number = (data["phone_number"] or "").strip()
+        if phone_number and len(phone_number) > 30:
+            return jsonify({"error": "Phone number must be 30 characters or fewer"}), 400
+        user.phone_number = phone_number if phone_number else None
 
     db.session.commit()
 
@@ -309,7 +316,7 @@ def update_profile():
             "email": user.email,
             "role": user.role.value,
             "timezone": user.timezone,
-            "webhook_url": user.webhook_url
+            "phone_number": user.phone_number
         }
     }), 200
 

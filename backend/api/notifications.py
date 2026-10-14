@@ -1,11 +1,25 @@
 from flask import Blueprint, Response, jsonify, stream_with_context
 from flask_jwt_extended import get_jwt_identity, jwt_required
+import json
+import os
+import time
 
 from services.digest_service import send_weekly_digest
 from services.notification_service import subscribe_to_notifications
 
 
 notifications_bp = Blueprint("notifications", __name__)
+
+# Bound how long one SSE connection may stay open. The browser's EventSource
+# reconnects when the stream ends, so this keeps a stalled or forgotten stream
+# from tying up a gunicorn worker thread indefinitely.
+SSE_MAX_LIFETIME_SECONDS = int(os.getenv("SSE_MAX_LIFETIME_SECONDS", "300"))
+
+# How long to block waiting for a Redis message before emitting a heartbeat.
+# A short interval keeps the client alive but, more importantly, makes the
+# worker attempt a write (and so notice a dropped client) quickly instead of
+# holding its thread for the whole stale-stream window.
+SSE_POLL_SECONDS = float(os.getenv("SSE_POLL_SECONDS", "2"))
 
 
 @notifications_bp.route(
@@ -39,6 +53,8 @@ def notification_stream():
     @stream_with_context
     def generate():
 
+        started_at = time.monotonic()
+
         try:
 
             # Tell the browser that the connection is active.
@@ -47,9 +63,15 @@ def notification_stream():
 
             while True:
 
+                if time.monotonic() - started_at > SSE_MAX_LIFETIME_SECONDS:
+                    # Close the stream; the client reconnects and picks it up.
+                    yield "event: reconnect\n"
+                    yield "data: {\"message\": \"Stream expired, reconnecting\"}\n\n"
+                    return
+
                 message = pubsub.get_message(
                     ignore_subscribe_messages=True,
-                    timeout=15
+                    timeout=SSE_POLL_SECONDS
                 )
 
                 if message is None:
@@ -61,8 +83,6 @@ def notification_stream():
                     continue
 
                 event_data = message["data"]
-
-                import json
 
                 event = json.loads(event_data)
 
@@ -80,9 +100,13 @@ def notification_stream():
     return Response(
         generate(),
         mimetype="text/event-stream",
+        # "close" (not "keep-alive"): an SSE socket must never be returned to
+        # the browser's shared connection pool for reuse. Pooling it means a
+        # few hard refreshes exhaust the per-host socket limit and every later
+        # navigation stalls.
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive"
+            "Connection": "close"
         }
     )

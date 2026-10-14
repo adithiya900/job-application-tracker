@@ -75,6 +75,13 @@ def integration_client(postgres_schema, postgres_engine, redis_container, redis_
 
     try:
         with app.app_context():
+            # Connect Factory Boy to the current SQLAlchemy session on the
+            # container-backed database, mirroring the unit-test conftest.
+            from tests.factories import ApplicationFactory, UserFactory
+
+            UserFactory._meta.sqlalchemy_session = db.session
+            ApplicationFactory._meta.sqlalchemy_session = db.session
+
             with app.test_client() as client:
                 yield client
 

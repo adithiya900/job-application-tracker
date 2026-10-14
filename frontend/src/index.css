@@ -234,10 +234,11 @@ p {
   border-bottom: 1px solid #2A2412;
 }
 
-.sidebar-nav {
+.sidebar-nav-scroll {
   flex: 1;
   padding: 16px 12px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar-nav a,
@@ -282,6 +283,7 @@ p {
 }
 
 .sidebar-footer {
+  flex-shrink: 0;
   padding: 16px 12px;
   border-top: 1px solid #2A2412;
 }

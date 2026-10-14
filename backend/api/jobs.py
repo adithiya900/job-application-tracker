@@ -19,8 +19,11 @@ from models.job import (
     ApplicationStatus,
     ApplicationStatusHistory,
     STATUS_TRANSITIONS,
+    InterviewDetail,
+    JobApplication,
 )
 from models.user import User
+from models.reminder import FollowUpReminder, ReminderStatus
 from schemas.application_schema import (
     CreateApplicationSchema,
     UpdateApplicationSchema
@@ -95,10 +98,20 @@ def serialize_application(application, include_history=False):
             h.to_dict() for h in application.status_history
         ]
         # Include interview details visible to candidate (no HR notes)
-        if application.interview_details:
-            data["interview_details"] = application.interview_details.to_dict(include_hr_notes=False)
+        interviews = db.session.query(InterviewDetail).filter_by(application_id=application.id).order_by(InterviewDetail.created_at).all()
+        if interviews:
+            data["interview_details"] = [i.to_dict(include_hr_notes=False) for i in interviews]
         else:
-            data["interview_details"] = None
+            data["interview_details"] = []
+        # Include feedback
+        data["feedback"] = [
+            f.to_dict(include_internal=False) for f in application.feedback
+        ]
+        # Include reminders for candidate view
+        data["reminders"] = [r.to_dict() for r in application.reminders if not r.dismissed]
+        # Include shortlist/tags
+        data["is_shortlisted"] = application.is_shortlisted
+        data["tags"] = [t.strip() for t in (application.tags or "").split(",") if t.strip()]
 
     return data
 
@@ -433,7 +446,99 @@ def get_analytics():
 
 
 # ==========================================
-# Get Application By ID
+# Get User Reminders
+# GET /api/reminders
+# ==========================================
+
+@jobs_bp.route("/api/reminders", methods=["GET"])
+@jwt_required()
+def get_user_reminders():
+    try:
+        user_id = int(get_jwt_identity())
+        pending_only = request.args.get("pending", "false").lower() == "true"
+
+        query = FollowUpReminder.query.filter_by(user_id=user_id, dismissed=False)
+        if pending_only:
+            query = query.filter(FollowUpReminder.status == ReminderStatus.PENDING)
+
+        query = query.order_by(FollowUpReminder.scheduled_at)
+        reminders = query.limit(100).all()
+
+        result = []
+        for r in reminders:
+            item = r.to_dict()
+            app = db.session.get(JobApplication, r.application_id)
+            if app:
+                item["application"] = {
+                    "company": app.company,
+                    "role": app.role,
+                    "status": app.status.value,
+                }
+            result.append(item)
+
+        return jsonify({"reminders": result}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# =================================================
+# Dismiss User Reminder
+# PATCH /api/reminders/<id>/dismiss
+# =================================================
+
+@jobs_bp.route("/api/reminders/<int:reminder_id>/dismiss", methods=["PATCH"])
+@jwt_required()
+def dismiss_reminder(reminder_id):
+    try:
+        user_id = int(get_jwt_identity())
+        reminder = db.session.get(FollowUpReminder, reminder_id)
+        if not reminder or reminder.user_id != user_id:
+            return jsonify({"error": "Reminder not found"}), 404
+
+        reminder.dismissed = True
+        reminder.status = ReminderStatus.DISMISSED
+        db.session.commit()
+
+        return jsonify({"message": "Reminder dismissed"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+# ==========================================
+# Candidate-facing feedback endpoint
+# GET /api/applications/<id>/feedback
+# Only returns feedback that HR has marked as candidate_facing
+# ==========================================
+
+@jobs_bp.route("/api/applications/<int:application_id>/feedback", methods=["GET"])
+@jwt_required()
+def get_candidate_feedback(application_id):
+    try:
+        from models.job import InterviewFeedback
+
+        user_id = int(get_jwt_identity())
+        application = JobApplication.query.filter_by(
+            id=application_id, user_id=user_id
+        ).first()
+
+        if not application:
+            return jsonify({"error": "Application not found"}), 404
+
+        feedback_list = InterviewFeedback.query.filter_by(
+            application_id=application_id
+        ).filter(InterviewFeedback.candidate_facing == True).all()
+
+        return jsonify({
+            "feedback": [f.to_dict(include_internal=False, include_candidate_facing=True) for f in feedback_list]
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # GET /applications/<id>
 # ==========================================
 
