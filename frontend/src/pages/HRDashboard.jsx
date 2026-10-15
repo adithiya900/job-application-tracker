@@ -1084,29 +1084,27 @@ export default function HRDashboard() {
               <tbody>
                 {applications.map((app) => (
                   <tr key={app.id}>
+                    <td style={{ width: "40px" }}>
+                      <input
+                        type="checkbox"
+                        style={{ accentColor: "#D4AF37" }}
+                        checked={selectedApps.includes(app.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedApps([...new Set([...selectedApps, app.id])]);
+                          } else {
+                            setSelectedApps(selectedApps.filter(id => id !== app.id));
+                          }
+                        }}
+                      />
+                    </td>
                     <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                          <input
-                            type="checkbox"
-                            style={{ accentColor: "#D4AF37" }}
-                            checked={selectedApps.includes(app.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedApps([...new Set([...selectedApps, app.id])]);
-                              } else {
-                                setSelectedApps(selectedApps.filter(id => id !== app.id));
-                              }
-                            }}
-                          />
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                          <div style={{ fontWeight: 600, color: "#fff", fontSize: "14px" }}>{app.candidate?.name || "Candidate"}</div>
-                          <div style={{ fontSize: "11px", color: "#777" }}>{app.candidate?.email}</div>
-                          {app.candidate?.phone_number && (
-                            <div style={{ fontSize: "10px", color: "#777" }}>{app.candidate.phone_number}</div>
-                          )}
-                        </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        <div style={{ fontWeight: 600, color: "#fff", fontSize: "14px" }}>{app.candidate?.name || "Candidate"}</div>
+                        <div style={{ fontSize: "11px", color: "#777" }}>{app.candidate?.email}</div>
+                        {app.candidate?.phone_number && (
+                          <div style={{ fontSize: "10px", color: "#777" }}>{app.candidate.phone_number}</div>
+                        )}
                       </div>
                     </td>
                     <td>{app.company}</td>
