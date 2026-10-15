@@ -677,3 +677,28 @@ def test_extract_resume_text_empty_pdf(
     )
 
     assert data["resume_text"] == ""
+
+def test_withdrawing_an_application_clears_its_shortlist_flag(client, test_user, auth_headers):
+    """
+    A withdrawn application is closed and must never stay shortlisted,
+    otherwise the HR list keeps a stale shortlist state for it.
+    """
+    shortlisted = JobApplication(
+        company="Shortlist Then Withdraw Co",
+        role="Engineer",
+        status=ApplicationStatus.PHONE_CALL,
+        is_shortlisted=True,
+        user_id=test_user.id,
+    )
+    db.session.add(shortlisted)
+    db.session.commit()
+
+    response = client.post(
+        f"/api/applications/{shortlisted.id}/withdraw",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    db.session.refresh(shortlisted)
+    assert shortlisted.status == ApplicationStatus.WITHDRAWN
+    assert shortlisted.is_shortlisted is False

@@ -64,11 +64,24 @@ def clean_postgres_db(postgres_schema, postgres_engine):
 @pytest.fixture
 def integration_client(postgres_schema, postgres_engine, redis_container, redis_client):
     original_engines = db._app_engines[app]
-    original_read_client = cache.cache._read_client
-    original_write_client = cache.cache._write_client
+    original_cache_impl = app.extensions["cache"][cache]
 
     app.config["TESTING"] = True
     db._app_engines[app] = {None: postgres_engine}
+
+    # app.py falls back to SimpleCache when Redis was unreachable at import
+    # time, and SimpleCache has no _read_client/_write_client. Integration
+    # tests always run against the started container, so re-initialise the app
+    # onto RedisCache before its clients are patched.
+    app.config["CACHE_TYPE"] = "RedisCache"
+    app.config["CACHE_REDIS_URL"] = (
+        f"redis://{redis_container.get_container_host_ip()}:"
+        f"{redis_container.get_exposed_port(6379)}/0"
+    )
+    cache.init_app(app)
+
+    original_read_client = cache.cache._read_client
+    original_write_client = cache.cache._write_client
 
     cache.cache._read_client = redis_client
     cache.cache._write_client = redis_client
@@ -90,3 +103,5 @@ def integration_client(postgres_schema, postgres_engine, redis_container, redis_
         db._app_engines[app] = original_engines
         cache.cache._read_client = original_read_client
         cache.cache._write_client = original_write_client
+        # Cache.cache is a read-only property; restore through the registry.
+        app.extensions["cache"][cache] = original_cache_impl

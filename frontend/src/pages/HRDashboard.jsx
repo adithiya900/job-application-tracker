@@ -1113,24 +1113,9 @@ export default function HRDashboard() {
                     <td>{app.role}</td>
                     <td><StatusBadge status={app.status} /></td>
                     <td>
-                      {app.status === "WITHDRAWN" ? (
-                        // No shortlisting a closed application. If it was
-                        // shortlisted earlier, keep the fact visible.
-                        app.is_shortlisted ? (
-                          <span
-                            style={{
-                              padding: "3px 8px", fontSize: "10px", fontWeight: 600,
-                              background: "rgba(255,215,0,0.08)", border: "1px solid #2A2A2A",
-                              borderRadius: "4px", color: "#A88A2A", whiteSpace: "nowrap"
-                            }}
-                            title="This application was withdrawn by the candidate"
-                          >
-                            ⭐ Shortlisted
-                          </span>
-                        ) : (
-                          <span style={{ color: "#555" }}>—</span>
-                        )
-                      ) : (
+                      {app.status === "WITHDRAWN" ? null : (
+                        // A closed application is never shortlisted, so the
+                        // column is left completely empty for it.
                         <button
                           style={{
                             padding: "3px 8px", fontSize: "10px", fontWeight: 600,

@@ -1403,6 +1403,9 @@ def withdraw_application(application_id):
         old_status = application.status
         application.status = ApplicationStatus.WITHDRAWN
 
+        # A withdrawn application is closed and is never shortlisted again.
+        application.is_shortlisted = False
+
         # Record history
         history = ApplicationStatusHistory(
             application_id=application.id,
