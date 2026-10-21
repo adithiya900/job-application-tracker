@@ -7,11 +7,13 @@ const CandidateNav = [
   { to: "/applications", icon: "📋", label: "My Applications" },
   { to: "/applications/add", icon: "＋", label: "Add Application" },
   { to: "/jobs", icon: "🔍", label: "Job Search" },
+  { to: "/interviews", icon: "🎙", label: "Interviews" },
   { to: "/settings", icon: "⚙", label: "Profile & Settings" },
 ];
 
 const HRNav = [
   { to: "/hr", icon: "⊞", label: "HR Dashboard" },
+  { to: "/hr/interviews", icon: "🎙", label: "Interviews" },
   { to: "/hr/analytics", icon: "📊", label: "Analytics" },
   { to: "/hr/reminders", icon: "🔔", label: "Reminders" },
   { to: "/settings", icon: "⚙", label: "Profile & Settings" },

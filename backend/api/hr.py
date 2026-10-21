@@ -770,9 +770,182 @@ def hr_notify_candidate(application_id):
 
 
 # ==============================================================
-# POST /api/hr/applications/bulk
-# HR performs bulk actions on multiple applications (status, shortlist, delete)
+# GET /api/hr/interviews
+# List all interview details across all applications (HR view)
 # ==============================================================
+
+@hr_bp.route("/hr/applications", methods=["GET"])
+@hr_required
+def hr_list_interviews():
+    try:
+        hr_user_id = int(get_jwt_identity())
+
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 20, type=int)
+        if per_page > 100:
+            per_page = 100
+        if page < 1:
+            page = 1
+
+        status_filter = request.args.get("status")
+        search = request.args.get("search")
+
+        query = (
+            db.session.query(InterviewDetail)
+            .join(JobApplication, InterviewDetail.application_id == JobApplication.id)
+        )
+
+        if status_filter:
+            query = query.filter(InterviewDetail.round_type == status_filter)
+
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                db.or_(
+                    JobApplication.company.ilike(search_term),
+                    JobApplication.role.ilike(search_term),
+                )
+            )
+
+        query = query.order_by(InterviewDetail.created_at.desc())
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+
+        result = []
+        for detail in pagination.items:
+            app = detail.application
+            candidate = db.session.get(User, app.user_id)
+            result.append({
+                "id": detail.id,
+                "application_id": application.id,
+                "company": application.company,
+                "role": application.role,
+                "candidate_name": candidate.name if candidate else None,
+                "candidate_email": candidate.email if candidate else None,
+                "candidate_id": application.user_id,
+                "interview_date": detail.interview_date.isoformat() if detail.interview_date else None,
+                "interview_time": detail.interview_time,
+                "interview_round": detail.interview_round,
+                "round_type": detail.round_type,
+                "interview_type": detail.interview_type,
+                "meeting_link": detail.meeting_link,
+                "interviewer": detail.interviewer,
+                "hr_notes": detail.hr_notes,
+                "created_at": detail.created_at.isoformat(),
+                "updated_at": detail.updated_at.isoformat(),
+            })
+
+        return jsonify({
+            "interviews": result,
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "pages": pagination.pages,
+                "has_next": pagination.has_next,
+                "has_prev": pagination.has_prev,
+            },
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==============================================================
+# GET /api/hr/applications/<id>/interview
+# Get interview details for a specific application (HR view)
+# ==============================================================
+
+@hr_bp.route("/applications/<int:application_id>/interview", methods=["GET"])
+@hr_required
+def hr_get_application_interview(application_id):
+    try:
+        hr_user_id = int(get_jwt_identity())
+
+        application = JobApplication.query.get(application_id)
+        if not application:
+            return jsonify({"error": "Application not found"}), 404
+
+        blocked = require_application_workable(application)
+        if blocked is not None:
+            return blocked
+
+        interview_details = InterviewDetail.query.filter_by(
+            application_id=application_id
+        ).order_by(InterviewDetail.created_at).all()
+
+        return jsonify({
+            "application_id": application.id,
+            "company": application.company,
+            "role": application.role,
+            "candidate_id": application.user_id,
+            "interview_details": [i.to_dict(include_hr_notes=True) for i in interview_details],
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==============================================================
+# DELETE /api/hr/applications/<id>/interview
+# Cancel/delete an interview
+# ==============================================================
+
+@hr_bp.route("/applications/<int:application_id>/interview", methods=["DELETE"])
+@hr_required
+def hr_delete_interview(application_id):
+    try:
+        hr_user_id = int(get_jwt_identity())
+
+        application = JobApplication.query.get(application_id)
+        if not application:
+            return jsonify({"error": "Application not found"}), 404
+
+        blocked = require_application_workable(application)
+        if blocked is not None:
+            return blocked
+
+        # Delete all interview details for this application
+        InterviewDetail.query.filter_by(application_id=application_id).delete()
+        db.session.commit()
+
+        # Notify candidate
+        application = db.session.get(JobApplication, application_id)
+        candidate = db.session.get(User, application.user_id)
+        if candidate:
+            publish_notification(
+                user_id=application.user_id,
+                notification_type="INTERVIEW_CANCELLED",
+                message=f"Interview for {application.role} at {application.company} has been cancelled.",
+                data={
+                    "application_id": application.id,
+                    "company": application.company,
+                    "role": application.role,
+                    "interview_id": application_id,
+                },
+            )
+
+        db.session.add(AuditLog(
+            user_id=hr_user_id,
+            action="interview_cancelled",
+            target_user_id=application.user_id,
+            details={
+                "application_id": application.id,
+                "company": application.company,
+                "role": application.role,
+            },
+        ))
+        db.session.commit()
+
+        return jsonify({
+            "message": "Interview cancelled successfully",
+            "application_id": application.id,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
 
 @hr_bp.route("/applications/bulk", methods=["POST"])
 @hr_required

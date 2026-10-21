@@ -18,10 +18,12 @@ const JobSearch = lazy(() => import("./pages/JobSearch"));
 const HRDashboard = lazy(() => import("./pages/HRDashboard"));
 const HRAnalytics = lazy(() => import("./pages/HRAnalytics"));
 const HRReminders = lazy(() => import("./pages/HRReminders"));
+const HRInterviews = lazy(() => import("./pages/HRInterviews"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminReports = lazy(() => import("./pages/AdminReports"));
 const Settings = lazy(() => import("./pages/Settings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Interviews = lazy(() => import("./pages/Interviews"));
 
 
 import { ApplicationProvider } from "./contexts/ApplicationContext";
@@ -79,6 +81,10 @@ function App() {
                     path="applications/add"
                     element={<AddApplication />}
                   />
+                  <Route
+                    path="interviews"
+                    element={<Interviews />}
+                  />
 
                   <Route
                     path="jobs"
@@ -94,6 +100,7 @@ function App() {
                     <Route path="hr" element={<HRDashboard />} />
                     <Route path="hr/analytics" element={<HRAnalytics />} />
                     <Route path="hr/reminders" element={<HRReminders />} />
+                    <Route path="hr/interviews" element={<HRInterviews />} />
                   </Route>
 
                   <Route element={<AdminRoute />}>
