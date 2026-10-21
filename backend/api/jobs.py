@@ -93,16 +93,17 @@ def serialize_application(application, include_history=False):
         "resume_path": application.resume_path,
     }
 
+    # Include interview details visible to candidate (no HR notes)
+    interviews = db.session.query(InterviewDetail).filter_by(application_id=application.id).order_by(InterviewDetail.created_at).all()
+    if interviews:
+        data["interview_details"] = [i.to_dict(include_hr_notes=False) for i in interviews]
+    else:
+        data["interview_details"] = []
+
     if include_history:
         data["status_history"] = [
             h.to_dict() for h in application.status_history
         ]
-        # Include interview details visible to candidate (no HR notes)
-        interviews = db.session.query(InterviewDetail).filter_by(application_id=application.id).order_by(InterviewDetail.created_at).all()
-        if interviews:
-            data["interview_details"] = [i.to_dict(include_hr_notes=False) for i in interviews]
-        else:
-            data["interview_details"] = []
         # Include feedback
         data["feedback"] = [
             f.to_dict(include_internal=False) for f in application.feedback
@@ -1535,3 +1536,4 @@ def get_all_applications_v2():
         })
 
     return response    
+
